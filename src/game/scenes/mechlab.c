@@ -1,7 +1,12 @@
 #include <SDL.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "archipelago/apconnect.h"
+#include "archipelago/apitems.h"
+#include "archipelago/apstate.h"
 #include "formats/error.h"
 #include "formats/tournament.h"
 #include "game/game_state.h"
@@ -139,6 +144,123 @@ void mechlab_set_hint(scene *scene, const char *hint) {
     label_set_text(local->hint, hint);
 }
 
+void mechlab_set_hint_wrapped(scene *scene, const char *hint) {
+    char buf[79];
+    strncpy(buf, hint, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    if(strlen(buf) > 39) {
+        int wrap = -1;
+        for(int i = 38; i >= 0; i--) {
+            if(buf[i] == ' ') { wrap = i; break; }
+        }
+        if(wrap >= 0) {
+            buf[wrap] = '\n';
+            buf[wrap + 1 + 39] = '\0';
+        } else {
+            buf[39] = '\0';
+        }
+    }
+    mechlab_set_hint(scene, buf);
+}
+
+static scene *g_mechlab_scene = NULL;
+
+static void mechlab_ap_format_hint(const char *item_name, const char *player_name, char *out, size_t out_size) {
+    char tmp[128];
+    snprintf(tmp, sizeof(tmp), "%s - %s", item_name, player_name);
+    for(int i = 0; tmp[i]; i++) tmp[i] = (char)toupper((unsigned char)tmp[i]);
+    // Substitute "PROGRESSIVE " -> "PROG. " before truncating
+    const char *from = "PROGRESSIVE ";
+    const char *to = "PROG. ";
+    size_t from_len = strlen(from);
+    size_t to_len = strlen(to);
+    char sub[128];
+    size_t si = 0, ti = 0;
+    while(tmp[ti] && si + 1 < sizeof(sub)) {
+        if(strncmp(tmp + ti, from, from_len) == 0 && si + to_len < sizeof(sub)) {
+            memcpy(sub + si, to, to_len);
+            si += to_len;
+            ti += from_len;
+        } else {
+            sub[si++] = tmp[ti++];
+        }
+    }
+    sub[si] = '\0';
+    if(strlen(sub) > 39) {
+        int wrap = -1;
+        for(int i = 38; i >= 0; i--) {
+            if(sub[i] == ' ') { wrap = i; break; }
+        }
+        if(wrap >= 0) {
+            sub[wrap] = '\n';
+            sub[wrap + 1 + 39] = '\0';
+        } else {
+            sub[39] = '\0';
+        }
+    }
+    snprintf(out, out_size, "%s", sub);
+}
+
+static void mechlab_ap_item_received(const char *item_name, const char *player_name) {
+    if(!g_mechlab_scene) return;
+    char buf[79];
+    mechlab_ap_format_hint(item_name, player_name, buf, sizeof(buf));
+    mechlab_set_hint(g_mechlab_scene, buf);
+
+    // Re-sync pilot stats immediately so the received item is visible now,
+    // not just on the next mechlab entry.
+    game_player *p1 = game_state_get_player(g_mechlab_scene->gs, 0);
+    sd_pilot *pilot = game_player_get_pilot(p1);
+    if(pilot) {
+        int har = pilot->har_id;
+        if(har >= 0 && har < 11) {
+            pilot->arm_power       = APItems.har_stats[har][AP_STAT_ARM_POWER];
+            pilot->leg_power       = APItems.har_stats[har][AP_STAT_LEG_POWER];
+            pilot->arm_speed       = APItems.har_stats[har][AP_STAT_ARM_SPEED];
+            pilot->leg_speed       = APItems.har_stats[har][AP_STAT_LEG_SPEED];
+            pilot->armor           = APItems.har_stats[har][AP_STAT_ARMOR];
+            pilot->stun_resistance = APItems.har_stats[har][AP_STAT_STUN_RESIST];
+        }
+        pilot->power       = APItems.pilot_stats[AP_PILOT_POWER];
+        pilot->agility     = APItems.pilot_stats[AP_PILOT_AGILITY];
+        pilot->endurance   = APItems.pilot_stats[AP_PILOT_ENDURANCE];
+        pilot->har_trades  = APItems.har_unlocked;
+        // Don't call mechlab_update here — on_items_received calls g_item_cb mid-loop
+        // while APChecks is only partially rebuilt. The normal mechlab tick will
+        // re-render on the next frame with the fully-rebuilt state.
+    }
+}
+
+static void mechlab_ap_items_done(void) {
+    if(!g_mechlab_scene) return;
+    game_player *p1 = game_state_get_player(g_mechlab_scene->gs, 0);
+    sd_pilot *pilot = game_player_get_pilot(p1);
+    if(pilot) {
+        int har = pilot->har_id;
+        if(har >= 0 && har < 11) {
+            pilot->arm_power       = APItems.har_stats[har][AP_STAT_ARM_POWER];
+            pilot->leg_power       = APItems.har_stats[har][AP_STAT_LEG_POWER];
+            pilot->arm_speed       = APItems.har_stats[har][AP_STAT_ARM_SPEED];
+            pilot->leg_speed       = APItems.har_stats[har][AP_STAT_LEG_SPEED];
+            pilot->armor           = APItems.har_stats[har][AP_STAT_ARMOR];
+            pilot->stun_resistance = APItems.har_stats[har][AP_STAT_STUN_RESIST];
+        }
+        pilot->power      = APItems.pilot_stats[AP_PILOT_POWER];
+        pilot->agility    = APItems.pilot_stats[AP_PILOT_AGILITY];
+        pilot->endurance  = APItems.pilot_stats[AP_PILOT_ENDURANCE];
+        pilot->har_trades = APItems.har_unlocked;
+    }
+    mechlab_update(g_mechlab_scene);
+}
+
+static void mechlab_ap_buy_hint(int64_t location_id, const char *item_name, const char *player_name) {
+    (void)location_id;
+    if(!g_mechlab_scene) return;
+    char buf[79];
+    mechlab_ap_format_hint(item_name, player_name, buf, sizeof(buf));
+    mechlab_set_hint(g_mechlab_scene, buf);
+}
+
 static void mechlab_mech_finished_cb(object *obj) {
     player_reset(obj);
     player_run(obj);
@@ -172,6 +294,10 @@ sd_chr_enemy *mechlab_next_opponent(scene *scene) {
 
 void mechlab_free(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
+    g_mechlab_scene = NULL;
+    Archipelago_SetItemReceivedCallback(NULL);
+    Archipelago_SetBuyHintCallback(NULL);
+    Archipelago_SetItemsDoneCallback(NULL);
 
     game_player *player1 = game_state_get_player(scene->gs, 0);
     // save the character file
@@ -338,6 +464,19 @@ void mechlab_tick(scene *scene, int paused) {
                 player1->pilot->money = 0;
             } else {
                 player1->pilot->money = player1->pilot->money - trn->registration_fee;
+            }
+            if(ap_mode) {
+                // Map TRN filename to AP tournament index (0=NAO,1=Katushai,2=WAR,3=World).
+                static const int ap_offsets[] = AP_TOURNAMENT_OFFSETS;
+                int tidx = -1;
+                if(strncmp(trn->filename, "NAO", 3) == 0)      tidx = 0;
+                else if(strncmp(trn->filename, "KATUSHAI", 8) == 0) tidx = 1;
+                else if(strncmp(trn->filename, "WAR", 3) == 0) tidx = 2;
+                else if(strncmp(trn->filename, "WORLD", 5) == 0)    tidx = 3;
+                if(tidx >= 0) {
+                    APTournament.tournament_idx = tidx;
+                    APTournament.match_offset   = ap_offsets[tidx];
+                }
             }
             sd_chr_file *oldchr = player1->chr;
             player1->chr = omf_calloc(1, sizeof(sd_chr_file));
@@ -631,6 +770,33 @@ int mechlab_create(scene *scene) {
 
     scene_set_userdata(scene, local);
     bool found = mechlab_find_last_player(scene);
+
+    // Sync AP state into pilot on each mechlab entry.
+    if(ap_mode) {
+        game_player *p1 = game_state_get_player(scene->gs, 0);
+        sd_pilot *pilot = game_player_get_pilot(p1);
+        if(pilot) {
+            // Drain accumulated AP money.
+            pilot->money += APStats.pending_money;
+            APStats.pending_money = 0;
+            // Set HAR stats for the currently equipped HAR from AP items.
+            int har = pilot->har_id;
+            if(har >= 0 && har < 11) {
+                pilot->arm_power      = APItems.har_stats[har][AP_STAT_ARM_POWER];
+                pilot->leg_power      = APItems.har_stats[har][AP_STAT_LEG_POWER];
+                pilot->arm_speed      = APItems.har_stats[har][AP_STAT_ARM_SPEED];
+                pilot->leg_speed      = APItems.har_stats[har][AP_STAT_LEG_SPEED];
+                pilot->armor          = APItems.har_stats[har][AP_STAT_ARMOR];
+                pilot->stun_resistance = APItems.har_stats[har][AP_STAT_STUN_RESIST];
+            }
+            // Set pilot stats from AP items.
+            pilot->power      = APItems.pilot_stats[AP_PILOT_POWER];
+            pilot->agility    = APItems.pilot_stats[AP_PILOT_AGILITY];
+            pilot->endurance  = APItems.pilot_stats[AP_PILOT_ENDURANCE];
+            pilot->har_trades = APItems.har_unlocked;
+        }
+    }
+
     mechlab_select_dashboard(scene, DASHBOARD_STATS);
 
     menu_transparent_bg_create(&local->popup_bg1, POPUP_BG_W, POPUP_BG_H);
@@ -648,6 +814,11 @@ int mechlab_create(scene *scene) {
     scene_set_render_cb(scene, mechlab_render);
     scene_set_free_cb(scene, mechlab_free);
     scene_set_dynamic_tick_cb(scene, mechlab_tick);
+
+    g_mechlab_scene = scene;
+    Archipelago_SetItemReceivedCallback(mechlab_ap_item_received);
+    Archipelago_SetBuyHintCallback(mechlab_ap_buy_hint);
+    Archipelago_SetItemsDoneCallback(mechlab_ap_items_done);
 
     return 0;
 }

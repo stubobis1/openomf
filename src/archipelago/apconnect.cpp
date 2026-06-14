@@ -1,0 +1,253 @@
+// Suppress warnings from heavy header-only libs before including them.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+#define AP_NO_SCHEMA
+#define ASIO_STANDALONE
+#define _WEBSOCKETPP_CPP11_STRICT_
+
+#include "submodule/apclientpp/apclient.hpp"
+#include "submodule/apclientpp/apuuid.hpp"
+
+#pragma GCC diagnostic pop
+
+extern "C" {
+#include "apconnect.h"
+#include "apitems.h"
+#include "apstate.h"
+}
+
+#include <memory>
+#include <string>
+#include <cstring>
+#include <cstdio>
+
+using nlohmann::json;
+
+// ----- Exported globals -----
+ap_items_t            APItems        = {};
+ap_stats_t            APStats        = {};
+ap_seed_settings_t    APSeedSettings = {};
+ap_save_t             APSave         = {};
+ap_checks_t           APChecks       = {};
+ap_tournament_state_t APTournament   = {};
+bool                  ap_mode        = false;
+
+// ----- Internal state -----
+static std::unique_ptr<APClient> ap;
+static ap_connection_status_t    g_status = APCONN_NOT_CONNECTED;
+static void (*g_item_cb)(const char *item_name, const char *player_name) = nullptr;
+static void (*g_buy_hint_cb)(int64_t location_id, const char *item_name, const char *player_name) = nullptr;
+static void (*g_items_done_cb)(void) = nullptr;
+
+// ----- Item helpers -----
+
+static bool is_har_unlock(int64_t id) {
+    return id >= AP_BASE_ID && id <= AP_BASE_ID + 10;
+}
+
+static bool is_har_stat(int64_t id) {
+    return id >= AP_BASE_ID + 100 && id < AP_BASE_ID + 100 + 11 * 6;
+}
+
+static bool is_pilot_stat(int64_t id) {
+    return id >= AP_BASE_ID + 200 && id < AP_BASE_ID + 200 + 3;
+}
+
+static bool is_progressive(int64_t id) {
+    return is_har_stat(id) || is_pilot_stat(id);
+}
+
+static void apply_item_idempotent(int64_t id) {
+    if (is_har_unlock(id)) {
+        int har = (int)(id - AP_BASE_ID);
+        APItems.har_unlocked |= (uint16_t)(1u << har);
+    } else if (is_har_stat(id)) {
+        int offset = (int)(id - (AP_BASE_ID + 100));
+        int har    = offset / AP_STAT_COUNT;
+        int stat   = offset % AP_STAT_COUNT;
+        if (har < 11 && stat < AP_STAT_COUNT) {
+            uint8_t cur = APItems.har_stats[har][stat];
+            if (cur < APSeedSettings.har_stat_max) {
+                APItems.har_stats[har][stat] = (uint8_t)(cur + 1);
+            }
+        }
+    } else if (is_pilot_stat(id)) {
+        int stat = (int)(id - (AP_BASE_ID + 200));
+        if (stat < AP_PILOT_STAT_COUNT) {
+            uint8_t cur = APItems.pilot_stats[stat];
+            if (cur < APSeedSettings.pilot_stat_max) {
+                APItems.pilot_stats[stat] = (uint8_t)(cur + 1);
+            }
+        }
+    }
+}
+
+static void apply_item_consumable(int64_t id) {
+    if (id == AP_ITEM_MONEY_SMALL) {
+        APStats.pending_money += AP_MONEY_SMALL_VALUE;
+    } else if (id == AP_ITEM_MONEY_LARGE) {
+        APStats.pending_money += AP_MONEY_LARGE_VALUE;
+    }
+    // AP_ITEM_NOTHING: no-op
+}
+
+// ----- Handlers -----
+
+static void on_items_received(const std::list<APClient::NetworkItem>& items) {
+    if (items.empty()) return;
+
+    // The server sends either a full replay (index starts at 0) or an incremental
+    // batch (index > 0). Only wipe and rebuild on a full replay; for incremental
+    // batches, accumulate on top of the existing state.
+    if (items.front().index == 0) {
+        memset(&APItems,  0, sizeof(APItems));
+        memset(&APChecks, 0, sizeof(APChecks));
+        // Re-apply starting HAR in case it is precollected and absent from the replay.
+        if (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10) {
+            APItems.har_unlocked |= (uint16_t)(1u << APSeedSettings.starting_har);
+        }
+    }
+
+    for (auto& net_item : items) {
+        apply_item_idempotent(net_item.item);
+
+        // Rebuild check counters from the location each item came from.
+        // This tells us how many times each buy/train location has been checked,
+        // independently of what item was received there.
+        int64_t loc = net_item.location;
+        if (loc >= AP_LOC_TRAIN_BASE &&
+                loc < AP_LOC_TRAIN_BASE + (int64_t)AP_PILOT_STAT_COUNT * AP_LOC_TRAIN_STAT_STRIDE) {
+            int stat = (int)((loc - AP_LOC_TRAIN_BASE) / AP_LOC_TRAIN_STAT_STRIDE);
+            if (stat < AP_PILOT_STAT_COUNT && APChecks.pilot_train[stat] < 255)
+                APChecks.pilot_train[stat]++;
+        } else if (loc >= AP_LOC_BUY_BASE &&
+                   loc < AP_LOC_BUY_BASE + (int64_t)11 * AP_LOC_BUY_HAR_STRIDE) {
+            int64_t off = loc - AP_LOC_BUY_BASE;
+            int har  = (int)(off / AP_LOC_BUY_HAR_STRIDE);
+            int stat = (int)((off % AP_LOC_BUY_HAR_STRIDE) / AP_LOC_BUY_STAT_STRIDE);
+            if (har < 11 && stat < AP_STAT_COUNT && APChecks.har_buy[har][stat] < 255)
+                APChecks.har_buy[har][stat]++;
+        }
+
+        // Consumables (money): only apply for indices beyond what we already processed.
+        if ((uint32_t)net_item.index > APSave.last_applied_item_index) {
+            apply_item_consumable(net_item.item);
+            APSave.last_applied_item_index = (uint32_t)net_item.index;
+        }
+
+        if (g_item_cb) {
+            std::string item_name   = ap->get_item_name(net_item.item, ap->get_player_game(net_item.player));
+            std::string player_name = ap->get_player_alias(net_item.player);
+            g_item_cb(item_name.c_str(), player_name.c_str());
+        }
+    }
+
+    // Fire once after the full batch so callers can refresh UI with complete state.
+    if (g_items_done_cb) g_items_done_cb();
+}
+
+static void on_slot_connected(const json& slot_data) {
+    // Parse mandatory slot data fields.
+    if (slot_data.contains("goal_tournament"))
+        APSeedSettings.goal_tournament = slot_data["goal_tournament"].get<int>();
+    if (slot_data.contains("starting_har"))
+        APSeedSettings.starting_har = slot_data["starting_har"].get<int>();
+    if (slot_data.contains("har_stat_max"))
+        APSeedSettings.har_stat_max = slot_data["har_stat_max"].get<int>();
+    if (slot_data.contains("pilot_stat_max"))
+        APSeedSettings.pilot_stat_max = slot_data["pilot_stat_max"].get<int>();
+    if (slot_data.contains("include_buy"))
+        APSeedSettings.include_buy = slot_data["include_buy"].get<bool>();
+    if (slot_data.contains("buy_cost_factor"))
+        APSeedSettings.buy_cost_factor = slot_data["buy_cost_factor"].get<int>();
+
+    // Mark starting HAR as unlocked — it's precollected on server but we still need it locally.
+    if (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10) {
+        APItems.har_unlocked |= (uint16_t)(1u << APSeedSettings.starting_har);
+    }
+
+    g_status = APCONN_READY;
+    ap_mode  = true;
+}
+
+// ----- Public API -----
+
+extern "C" void Archipelago_Connect(const char *uri, const char *slot, const char *password) {
+    g_status = APCONN_CONNECTING;
+    ap_mode  = false;
+
+    std::string uuid = ap_get_uuid("openomf");
+    ap = std::make_unique<APClient>(uuid, "One Must Fall: 2097", uri);
+
+    ap->set_room_info_handler([=]() {
+        ap->ConnectSlot(slot, password ? password : "",
+                        0b111 /* ITEMS_HANDLING_ALL */, {}, {0, 6, 0});
+    });
+    ap->set_slot_connected_handler(on_slot_connected);
+    ap->set_slot_refused_handler([](const std::list<std::string>& errors) {
+        (void)errors;
+        g_status = APCONN_FATAL_ERROR;
+    });
+    ap->set_items_received_handler(on_items_received);
+    ap->set_location_info_handler([=](const std::list<APClient::NetworkItem>& items) {
+        if (!g_buy_hint_cb) return;
+        for (const auto& item : items) {
+            std::string iname = ap->get_item_name(item.item, ap->get_player_game(item.player));
+            std::string pname = ap->get_player_alias(item.player);
+            g_buy_hint_cb(item.location, iname.c_str(), pname.c_str());
+        }
+    });
+    ap->set_socket_disconnected_handler([]() {
+        if (g_status == APCONN_READY) {
+            g_status = APCONN_CONNECTING; // reconnecting
+        }
+    });
+}
+
+extern "C" void Archipelago_Poll(void) {
+    if (ap) ap->poll();
+}
+
+extern "C" void Archipelago_Disconnect(void) {
+    ap.reset();
+    g_status = APCONN_NOT_CONNECTED;
+    ap_mode  = false;
+}
+
+extern "C" ap_connection_status_t Archipelago_ConnectionStatus(void) {
+    return g_status;
+}
+
+extern "C" void Archipelago_SendCheck(int64_t location_id) {
+    if (ap && g_status == APCONN_READY) {
+        ap->LocationChecks({location_id});
+    }
+}
+
+extern "C" void Archipelago_GoalComplete(void) {
+    if (ap && g_status == APCONN_READY) {
+        ap->StatusUpdate(APClient::ClientStatus::GOAL);
+    }
+}
+
+extern "C" void Archipelago_SetItemReceivedCallback(void (*cb)(const char *item_name, const char *player_name)) {
+    g_item_cb = cb;
+}
+
+extern "C" void Archipelago_ScoutBuyLocation(int64_t location_id) {
+    if (ap && g_status == APCONN_READY) {
+        ap->LocationScouts({location_id}, 1 /* create_as_hint = broadcast */);
+    }
+}
+
+extern "C" void Archipelago_SetBuyHintCallback(void (*cb)(int64_t location_id, const char *item_name, const char *player_name)) {
+    g_buy_hint_cb = cb;
+}
+
+extern "C" void Archipelago_SetItemsDoneCallback(void (*cb)(void)) {
+    g_items_done_cb = cb;
+}
