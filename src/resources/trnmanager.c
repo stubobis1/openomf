@@ -40,6 +40,7 @@ void trnlist_init(vector *trnlist) {
             path_filename(trn_file, &fn);
             modmanager_get_tournament_mod(str_c(&fn), &trn);
             str_free(&fn);
+            trn_strip_pilot_requirements(&trn);
             vector_append(trnlist, &trn);
         } else {
             log_error("Could not load tournament %s", path_c(trn_file));
@@ -54,6 +55,25 @@ void trnlist_init(vector *trnlist) {
 
 error_0:
     list_free(&dir_list);
+}
+
+void trn_strip_pilot_requirements(sd_tournament_file *trn) {
+    for(uint16_t i = 0; i < trn->enemy_count; i++) {
+        sd_pilot *p = trn->enemies[i];
+        if(!p) continue;
+        p->secret = 0;
+        p->only_fight_once = 0;
+        p->req_enemy = 0;
+        p->req_difficulty = 0;
+        p->req_rank = 0;
+        p->req_vitality = 0;
+        p->req_fighter = 0;
+        p->req_accuracy = 0;
+        p->req_avg_dmg = 0;
+        p->req_max_rank = 0;
+        p->req_scrap = 0;
+        p->req_destroy = 0;
+    }
 }
 
 void trnlist_free(vector *trnlist) {
@@ -78,5 +98,6 @@ int trn_load(sd_tournament_file *trn, const char *trn_name) {
 
     // apply any mods
     modmanager_get_tournament_mod(trn_name, trn);
+    trn_strip_pilot_requirements(trn);
     return 0;
 }
