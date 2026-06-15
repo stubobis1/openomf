@@ -11,7 +11,7 @@ docker run --rm -v "$REPO:/src" "$IMAGE" bash -c "
   rm -rf /src/build
   mkdir /src/build
   cd /src/build
-  cmake -DCMAKE_BUILD_TYPE=Debug ..
+  cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_ARCHIPELAGO=ON ..
   make -j\$(nproc)
   chown -R $(id -u):$(id -g) /src/build
 "
@@ -26,10 +26,19 @@ docker run --rm -v "$BUILD:/out" "$IMAGE" bash -c "
   chown -R $(id -u):$(id -g) /out/lib
 "
 rm -f "$BUILD/lib/libc.so.6" "$BUILD/lib/libm.so.6" "$BUILD/lib/libmvec.so.1" "$BUILD/lib/libdl.so.2"
+rm -f "$BUILD/lib/libssl.so"* "$BUILD/lib/libcrypto.so"*
+rm -f "$BUILD/lib/libglib-2.0.so"* "$BUILD/lib/libgmodule-2.0.so"* "$BUILD/lib/libgobject-2.0.so"*
 
-# Game data: move OMF2097 files into resources/ if not already there
-if [ -f "$BUILD/SOUNDS.DAT" ]; then
-  mv "$BUILD"/*.DAT "$BUILD"/*.BK "$BUILD"/*.PSM "$BUILD"/*.PIC "$BUILD"/*.TRN "$BUILD"/*.PCX "$BUILD"/*.AF "$BUILD/resources/" 2>/dev/null || true
+# Game data: symlink OMF2097 files into resources/
+OMF2097="${XDG_DATA_HOME:-$HOME/.local/share}/OpenOMF/OMF2097"
+if [ -d "$OMF2097" ]; then
+  for f in "$OMF2097"/*; do
+    base="$(basename "$f")"
+    target="$BUILD/resources/$base"
+    [ -e "$target" ] || ln -s "$f" "$target"
+  done
+else
+  echo "WARNING: OMF2097 game data not found at $OMF2097"
 fi
 
 # Write launcher if missing

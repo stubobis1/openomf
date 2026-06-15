@@ -1,8 +1,7 @@
 #include <stdio.h>
 
-#include "archipelago/apconnect.h"
-#include "archipelago/apitems.h"
-#include "archipelago/apstate.h"
+/* AP */ #include "archipelago/ap_mechlab.h"
+/* AP */ #include "archipelago/apstate.h"
 #include "game/gui/label.h"
 #include "game/gui/sizer.h"
 #include "game/gui/spritebutton.h"
@@ -32,11 +31,7 @@ void lab_menu_training_power(component *c, void *userdata) {
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
     int32_t price = prices[level];
     pilot->money -= price;
-    if(ap_mode) {
-        Archipelago_SendCheck(ap_train_location_id(AP_PILOT_POWER, level + 1));
-        APChecks.pilot_train[AP_PILOT_POWER]++;
-        mechlab_set_hint(s, "");
-    } else {
+    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_POWER); } else {
         pilot->power++;
     }
     mechlab_update(s);
@@ -64,11 +59,7 @@ void lab_menu_training_agility(component *c, void *userdata) {
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
     int32_t price = prices[level];
     pilot->money -= price;
-    if(ap_mode) {
-        Archipelago_SendCheck(ap_train_location_id(AP_PILOT_AGILITY, level + 1));
-        APChecks.pilot_train[AP_PILOT_AGILITY]++;
-        mechlab_set_hint(s, "");
-    } else {
+    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_AGILITY); } else {
         pilot->agility++;
     }
     mechlab_update(s);
@@ -96,11 +87,7 @@ void lab_menu_training_endurance(component *c, void *userdata) {
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
     int32_t price = prices[level];
     pilot->money -= price;
-    if(ap_mode) {
-        Archipelago_SendCheck(ap_train_location_id(AP_PILOT_ENDURANCE, level + 1));
-        APChecks.pilot_train[AP_PILOT_ENDURANCE]++;
-        mechlab_set_hint(s, "");
-    } else {
+    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_ENDURANCE); } else {
         pilot->endurance++;
     }
     mechlab_update(s);
@@ -151,10 +138,9 @@ static void lab_menu_focus_power(component *c, bool focused, void *userdata) {
             snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
             label_set_text(label2, tmp);
         }
-        if(ap_mode)
-            Archipelago_ScoutBuyLocation(ap_train_location_id(AP_PILOT_POWER, level + 1));
-        else
+        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_POWER); } else {
             mechlab_set_hint_wrapped(s, lang_get(533));
+        }
     }
 }
 
@@ -175,10 +161,9 @@ static void lab_menu_focus_agility(component *c, bool focused, void *userdata) {
             snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
             label_set_text(label2, tmp);
         }
-        if(ap_mode)
-            Archipelago_ScoutBuyLocation(ap_train_location_id(AP_PILOT_AGILITY, level + 1));
-        else
+        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_AGILITY); } else {
             mechlab_set_hint_wrapped(s, lang_get(534));
+        }
     }
 }
 
@@ -199,10 +184,9 @@ static void lab_menu_focus_endurance(component *c, bool focused, void *userdata)
             snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
             label_set_text(label2, tmp);
         }
-        if(ap_mode)
-            Archipelago_ScoutBuyLocation(ap_train_location_id(AP_PILOT_ENDURANCE, level + 1));
-        else
+        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_ENDURANCE); } else {
             mechlab_set_hint_wrapped(s, lang_get(535));
+        }
     }
 }
 

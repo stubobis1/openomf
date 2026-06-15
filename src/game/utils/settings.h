@@ -129,6 +129,12 @@ typedef struct {
 } settings_network;
 
 typedef struct {
+    char *ap_server;    // host:port, e.g. "localhost:38281"
+    char *ap_slot;
+    char *ap_password;
+} settings_archipelago;
+
+typedef struct {
     settings_language language;
     settings_video video;
     settings_sound sound;
@@ -137,6 +143,7 @@ typedef struct {
     settings_tournament tournament;
     settings_keyboard keys;
     settings_network net;
+    settings_archipelago archipelago;
 } settings;
 
 int settings_write_defaults(const char *path);

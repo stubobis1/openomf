@@ -6,5 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxmp-dev libpng-dev zlib1g-dev \
     libopusfile-dev libepoxy-dev \
     libminiupnpc-dev libnatpmp-dev \
+    libssl-dev \
+    libasio-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src

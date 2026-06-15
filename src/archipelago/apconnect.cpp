@@ -18,6 +18,7 @@ extern "C" {
 #include "apconnect.h"
 #include "apitems.h"
 #include "apstate.h"
+#include "utils/log.h"
 }
 
 #include <memory>
@@ -89,8 +90,10 @@ static void apply_item_idempotent(int64_t id) {
 static void apply_item_consumable(int64_t id) {
     if (id == AP_ITEM_MONEY_SMALL) {
         APStats.pending_money += AP_MONEY_SMALL_VALUE;
+        log_debug("AP - money small: pending=%d", APStats.pending_money);
     } else if (id == AP_ITEM_MONEY_LARGE) {
         APStats.pending_money += AP_MONEY_LARGE_VALUE;
+        log_debug("AP - money large: pending=%d", APStats.pending_money);
     }
     // AP_ITEM_NOTHING: no-op
 }
@@ -104,12 +107,16 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
     // batch (index > 0). Only wipe and rebuild on a full replay; for incremental
     // batches, accumulate on top of the existing state.
     if (items.front().index == 0) {
+        log_debug("AP - items_received: full replay (%zu items)", items.size());
         memset(&APItems,  0, sizeof(APItems));
         memset(&APChecks, 0, sizeof(APChecks));
         // Re-apply starting HAR in case it is precollected and absent from the replay.
         if (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10) {
             APItems.har_unlocked |= (uint16_t)(1u << APSeedSettings.starting_har);
         }
+    } else {
+        log_debug("AP - items_received: incremental batch (%zu items, first index %u)",
+                  items.size(), (unsigned)items.front().index);
     }
 
     for (auto& net_item : items) {
@@ -142,6 +149,9 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
         if (g_item_cb) {
             std::string item_name   = ap->get_item_name(net_item.item, ap->get_player_game(net_item.player));
             std::string player_name = ap->get_player_alias(net_item.player);
+            log_debug("AP - item: %s from %s (index %u, loc %lld)",
+                      item_name.c_str(), player_name.c_str(),
+                      (unsigned)net_item.index, (long long)net_item.location);
             g_item_cb(item_name.c_str(), player_name.c_str());
         }
     }
@@ -151,6 +161,7 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
 }
 
 static void on_slot_connected(const json& slot_data) {
+    log_info("AP - slot connected");
     // Parse mandatory slot data fields.
     if (slot_data.contains("goal_tournament"))
         APSeedSettings.goal_tournament = slot_data["goal_tournament"].get<int>();
@@ -172,11 +183,16 @@ static void on_slot_connected(const json& slot_data) {
 
     g_status = APCONN_READY;
     ap_mode  = true;
+    log_info("AP - ready: goal=%d starting_har=%d har_stat_max=%d pilot_stat_max=%d include_buy=%d",
+             APSeedSettings.goal_tournament, APSeedSettings.starting_har,
+             APSeedSettings.har_stat_max, APSeedSettings.pilot_stat_max,
+             (int)APSeedSettings.include_buy);
 }
 
 // ----- Public API -----
 
 extern "C" void Archipelago_Connect(const char *uri, const char *slot, const char *password) {
+    log_info("AP - connecting: uri=%s slot=%s", uri, slot);
     g_status = APCONN_CONNECTING;
     ap_mode  = false;
 
@@ -190,6 +206,7 @@ extern "C" void Archipelago_Connect(const char *uri, const char *slot, const cha
     ap->set_slot_connected_handler(on_slot_connected);
     ap->set_slot_refused_handler([](const std::list<std::string>& errors) {
         (void)errors;
+        log_error("AP - slot refused");
         g_status = APCONN_FATAL_ERROR;
     });
     ap->set_items_received_handler(on_items_received);
@@ -202,6 +219,7 @@ extern "C" void Archipelago_Connect(const char *uri, const char *slot, const cha
         }
     });
     ap->set_socket_disconnected_handler([]() {
+        log_info("AP - socket disconnected");
         if (g_status == APCONN_READY) {
             g_status = APCONN_CONNECTING; // reconnecting
         }
@@ -223,12 +241,14 @@ extern "C" ap_connection_status_t Archipelago_ConnectionStatus(void) {
 }
 
 extern "C" void Archipelago_SendCheck(int64_t location_id) {
+    log_debug("AP - send check: loc %lld", (long long)location_id);
     if (ap && g_status == APCONN_READY) {
         ap->LocationChecks({location_id});
     }
 }
 
 extern "C" void Archipelago_GoalComplete(void) {
+    log_info("AP - goal complete");
     if (ap && g_status == APCONN_READY) {
         ap->StatusUpdate(APClient::ClientStatus::GOAL);
     }
@@ -239,6 +259,7 @@ extern "C" void Archipelago_SetItemReceivedCallback(void (*cb)(const char *item_
 }
 
 extern "C" void Archipelago_ScoutBuyLocation(int64_t location_id) {
+    log_debug("AP - scout: loc %lld", (long long)location_id);
     if (ap && g_status == APCONN_READY) {
         ap->LocationScouts({location_id}, 1 /* create_as_hint = broadcast */);
     }

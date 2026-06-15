@@ -1,4 +1,5 @@
 #include "game/scenes/mainmenu/menu_main.h"
+#include "game/scenes/mainmenu/menu_ap.h"
 #include "game/scenes/mainmenu/menu_configuration.h"
 #include "game/scenes/mainmenu/menu_gameplay.h"
 #include "game/scenes/mainmenu/menu_help.h"
@@ -112,6 +113,11 @@ void mainmenu_enter_network(component *c, void *userdata) {
     menu_set_submenu(c->parent, menu_net_create(s));
 }
 
+void mainmenu_enter_archipelago(component *c, void *userdata) {
+    scene *s = userdata;
+    menu_set_submenu(c->parent, menu_ap_create(s));
+}
+
 void mainmenu_enter_help(component *c, void *userdata) {
     scene *s = userdata;
     menu_set_submenu(c->parent, menu_help_create(s));
@@ -119,12 +125,7 @@ void mainmenu_enter_help(component *c, void *userdata) {
 
 component *menu_main_create(scene *s) {
     component *menu = menu_create();
-    menu_attach(menu, button_create("ONE PLAYER GAME", NULL, false, false, mainmenu_1v1, s));
-    menu_attach(menu, button_create("TWO PLAYER GAME", NULL, false, false, mainmenu_1v2, s));
-    menu_attach(menu, button_create("TOURNAMENT PLAY", NULL, false, false, mainmenu_mechlab, s));
-    component *net = button_create("NETWORK PLAY", NULL, false, false, mainmenu_enter_network, s);
-    widget_set_id(net, NETWORK_BUTTON_ID);
-    menu_attach(menu, net);
+    menu_attach(menu, button_create("ARCHIPELAGO", "Connect to an Archipelago multiworld server.", false, false, mainmenu_enter_archipelago, s));
     menu_attach(menu, button_create("CONFIGURATION", NULL, false, false, mainmenu_enter_configuration, s));
     menu_attach(menu, button_create("GAMEPLAY", NULL, false, false, mainmenu_enter_gameplay, s));
     menu_attach(menu, button_create("HELP", NULL, false, false, mainmenu_enter_help, s));
