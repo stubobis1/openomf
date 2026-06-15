@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 
+/* AP */ #include "archipelago/apstate.h"
 #include "game/gui/sizer.h"
 #include "game/gui/spritebutton.h"
 #include "game/gui/trn_menu.h"
@@ -27,9 +29,11 @@ void lab_menu_trade_done(component *menu, component *submenu) {
 bool confirm_trade(component *c, void *userdata) {
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
-    int trade_value = calculate_trade_value(&p1->chr->pilot);
-    int har_value = har_price(p1->pilot->har_id);
-    p1->chr->pilot.money += trade_value - har_value;
+    if(!ap_mode) {
+        int trade_value = calculate_trade_value(&p1->chr->pilot);
+        int har_value = har_price(p1->pilot->har_id);
+        p1->chr->pilot.money += trade_value - har_value;
+    }
     p1->chr->pilot.har_id = p1->pilot->har_id;
     p1->chr->pilot.leg_speed = 0;
     p1->chr->pilot.arm_speed = 0;
@@ -57,21 +61,32 @@ bool cancel_trade(component *c, void *userdata) {
 void lab_menu_trade(component *c, void *userdata) {
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
-    char tmp[100];
-    int trade_value = calculate_trade_value(&p1->chr->pilot);
-    int har_value = har_price(p1->pilot->har_id);
-    if(trade_value == har_value) {
-        snprintf(tmp, 100, lang_get(520), lang_get(31 + p1->chr->pilot.har_id), lang_get(31 + p1->pilot->har_id));
-    } else if(trade_value > har_value) {
-        char price[15];
-        snprintf(price, 15, "$ %dK", trade_value - har_value);
-        snprintf(tmp, 100, lang_get(518), lang_get(31 + p1->chr->pilot.har_id), lang_get(31 + p1->pilot->har_id),
-                 price);
-    } else if(trade_value + p1->pilot->money > har_value) {
-        char price[15];
-        snprintf(price, 15, "$ %dK", har_value - trade_value);
-        snprintf(tmp, 100, lang_get(519), lang_get(31 + p1->chr->pilot.har_id), price,
+    char tmp[100] = "";
+    if(ap_mode) {
+        // In AP mode all unlocked HARs trade for free
+        snprintf(tmp, sizeof(tmp), lang_get(520), lang_get(31 + p1->chr->pilot.har_id),
                  lang_get(31 + p1->pilot->har_id));
+    } else {
+        int trade_value = calculate_trade_value(&p1->chr->pilot);
+        int har_value = har_price(p1->pilot->har_id);
+        if(trade_value == har_value) {
+            snprintf(tmp, sizeof(tmp), lang_get(520), lang_get(31 + p1->chr->pilot.har_id),
+                     lang_get(31 + p1->pilot->har_id));
+        } else if(trade_value > har_value) {
+            char price[15];
+            snprintf(price, sizeof(price), "$ %dK", trade_value - har_value);
+            snprintf(tmp, sizeof(tmp), lang_get(518), lang_get(31 + p1->chr->pilot.har_id),
+                     lang_get(31 + p1->pilot->har_id), price);
+        } else if(trade_value + p1->pilot->money > har_value) {
+            char price[15];
+            snprintf(price, sizeof(price), "$ %dK", har_value - trade_value);
+            snprintf(tmp, sizeof(tmp), lang_get(519), lang_get(31 + p1->chr->pilot.har_id), price,
+                     lang_get(31 + p1->pilot->har_id));
+        } else {
+            log_debug("trade: can't afford HAR %d (need %d, have trade=%d money=%d)",
+                      p1->pilot->har_id, har_value, trade_value, p1->pilot->money);
+            return;
+        }
     }
 
     component *menu = lab_menu_confirm_create(s, confirm_trade, s, cancel_trade, s, tmp);
@@ -232,14 +247,33 @@ component *lab_menu_trade_create(scene *s) {
     // Initialize menu, and set button sheet
     component *menu = trnmenu_create(NULL, x, y, false);
 
-    // Init GUI buttons with locations from the "select" button sprites
+    // Build eligible list: unlocked and not current HAR.
+    // In AP mode trades are free so no affordability check; vanilla requires affordability.
+    int trade_value = ap_mode ? 0 : calculate_trade_value(p1->pilot);
+    int eligible[11];
+    int eligible_count = 0;
     for(int i = 0; i < animation_get_sprite_count(main_buttons); i++) {
-        if(i == p1->pilot->har_id || 0 == ((p1->pilot->har_trades >> i) & 1)) {
-            log_debug("skipping har %d", i, p1->pilot->har_trades);
-            continue;
-        }
-        log_debug("adding button");
+        if(i == p1->pilot->har_id) continue;
+        if(!((p1->pilot->har_trades >> i) & 1)) continue;
+        if(!ap_mode && har_price(i) > trade_value + p1->pilot->money) continue;
+        eligible[eligible_count++] = i;
+    }
+    log_debug("trade: %d eligible HARs (har_trades=0x%04x)", eligible_count, p1->pilot->har_trades);
 
+    // Cap at 6; if more, pick 6 at random each time
+    if(eligible_count > 6) {
+        for(int i = eligible_count - 1; i > 0; i--) {
+            int j = rand() % (i + 1);
+            int tmp = eligible[i];
+            eligible[i] = eligible[j];
+            eligible[j] = tmp;
+        }
+        eligible_count = 6;
+    }
+
+    // Add buttons for the chosen HARs
+    for(int k = 0; k < eligible_count; k++) {
+        int i = eligible[k];
         sprite *button_sprite = animation_get_sprite(main_buttons, i);
         component *button = sprite_button_from_details(&details_list[i], NULL, button_sprite->data, s);
         spritebutton_set_font(button, FONT_SMALL);

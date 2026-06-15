@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 /* AP */ #include "archipelago/ap_mechlab.h"
 /* AP */ #include "archipelago/apstate.h"
@@ -371,10 +372,6 @@ void lab_menu_customize_trade(component *c, void *userdata) {
 }
 
 void lab_menu_customize_check_trade_robot(component *c, void *userdata) {
-    if(ap_mode) {
-        component_disable(c, true);
-        return;
-    }
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
 
@@ -385,9 +382,19 @@ void lab_menu_customize_check_trade_robot(component *c, void *userdata) {
             // don't trade for the current HAR
             continue;
         }
-        if((p1->pilot->har_trades >> i) & 1 && har_prices[i] < trade_value + p1->pilot->money) {
-            trades = true;
+        // In AP mode any unlocked HAR is tradable; vanilla requires affordability.
+        if((p1->pilot->har_trades >> i) & 1) {
+            if(ap_mode || har_prices[i] < trade_value + p1->pilot->money) {
+                trades = true;
+                break;
+            }
         }
+    }
+    bool currently_disabled = component_is_disabled(c);
+    if(currently_disabled == trades) {
+        log_debug("trade robot: %s (har_trades=0x%04x trade_value=%d money=%d)",
+                  trades ? "enabled" : "disabled",
+                  p1->pilot->har_trades, trade_value, p1->pilot->money);
     }
     component_disable(c, !trades);
 }
@@ -704,42 +711,54 @@ void lab_menu_focus_trade(component *c, bool focused, void *userdata) {
         game_player *p1 = game_state_get_player(s->gs, 0);
         mechlab_set_hint(s, lang_get(565));
         int trade_value = calculate_trade_value(p1->pilot);
-        uint8_t trades[5];
-        memset(trades, 0, sizeof(trades));
+
+        // Build eligible list: unlocked + affordable (vanilla) or just unlocked (AP)
+        uint8_t trades[11];
         uint8_t tradecount = 0;
         for(int i = 0; i < 11; i++) {
-            if(i == p1->pilot->har_id) {
-                // don't trade for the current HAR
-                continue;
-            }
-            if((p1->pilot->har_trades >> i) & 1 && har_prices[i] < trade_value + p1->pilot->money) {
-                trades[tradecount] = i;
-                tradecount++;
-            }
+            if(i == p1->pilot->har_id) continue;
+            if(!((p1->pilot->har_trades >> i) & 1)) continue;
+            if(!ap_mode && !(har_prices[i] < trade_value + p1->pilot->money)) continue;
+            trades[tradecount++] = (uint8_t)i;
         }
-        log_debug("got %d trades from the bitmask %d", tradecount, p1->pilot->har_trades);
-        // check if there's anything for trade
+
+        // Cap at 6; if more, pick 6 at random
+        if(tradecount > 6) {
+            for(int i = tradecount - 1; i > 0; i--) {
+                int j = rand() % (i + 1);
+                uint8_t tmp = trades[i];
+                trades[i] = trades[j];
+                trades[j] = tmp;
+            }
+            tradecount = 6;
+        }
+
+        log_debug("trade hover: %d eligible (har_trades=0x%04x)", tradecount, p1->pilot->har_trades);
+
         if(tradecount == 0) {
             label_set_text(header_label, lang_get(488));
             label_set_text(details_label, "");
         } else {
             label_set_text(header_label, lang_get(461));
             char tmp[200] = "";
-            // pick 5 of however many we got
-            // naturally, I unrolled this loop for performance
             if(tradecount == 1) {
-                snprintf(tmp, 200, "%s", lang_get(31 + trades[0]));
+                snprintf(tmp, sizeof(tmp), "%s", lang_get(31 + trades[0]));
             } else if(tradecount == 2) {
-                snprintf(tmp, 200, "%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]));
+                snprintf(tmp, sizeof(tmp), "%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]));
             } else if(tradecount == 3) {
-                snprintf(tmp, 200, "%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
+                snprintf(tmp, sizeof(tmp), "%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
                          lang_get(31 + trades[2]));
             } else if(tradecount == 4) {
-                snprintf(tmp, 200, "%s\n%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
+                snprintf(tmp, sizeof(tmp), "%s\n%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
                          lang_get(31 + trades[2]), lang_get(31 + trades[3]));
             } else if(tradecount == 5) {
-                snprintf(tmp, 200, "%s\n%s\n%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
-                         lang_get(31 + trades[2]), lang_get(31 + trades[3]), lang_get(31 + trades[4]));
+                snprintf(tmp, sizeof(tmp), "%s\n%s\n%s\n%s\n%s", lang_get(31 + trades[0]),
+                         lang_get(31 + trades[1]), lang_get(31 + trades[2]), lang_get(31 + trades[3]),
+                         lang_get(31 + trades[4]));
+            } else {
+                snprintf(tmp, sizeof(tmp), "%s\n%s\n%s\n%s\n%s\n%s", lang_get(31 + trades[0]),
+                         lang_get(31 + trades[1]), lang_get(31 + trades[2]), lang_get(31 + trades[3]),
+                         lang_get(31 + trades[4]), lang_get(31 + trades[5]));
             }
             label_set_text(details_label, tmp);
         }

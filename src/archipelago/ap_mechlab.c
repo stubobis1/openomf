@@ -175,7 +175,8 @@ void ap_do_train(scene *s, int stat) {
     int level = APChecks.pilot_train[stat];
     log_debug("AP - train stat %d: check level %d", stat, level + 1);
     Archipelago_SendCheck(ap_train_location_id(stat, level + 1));
-    APChecks.pilot_train[stat]++;
+    // Do NOT increment APChecks here; on_items_received will increment it when
+    // the server echoes the item back, keeping the counter as single source of truth.
     mechlab_set_hint(s, "");
 }
 
@@ -197,7 +198,8 @@ void ap_do_buy_har(scene *s, int har_id, int stat) {
     int buy_level = APChecks.har_buy[har_id][stat];
     log_debug("AP - buy HAR %d stat %d: level %d", har_id, stat, buy_level + 1);
     Archipelago_SendCheck(ap_har_buy_location_id(har_id, stat, buy_level + 1));
-    APChecks.har_buy[har_id][stat]++;
+    // Do NOT increment APChecks here; on_items_received will increment it when
+    // the server echoes the item back, keeping the counter as single source of truth.
     mechlab_set_hint(s, "");
     mechlab_update(s);
 }
