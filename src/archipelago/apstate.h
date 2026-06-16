@@ -19,9 +19,11 @@
 
 // Items from AP server — rebuilt from full replay on each connect; do not persist.
 typedef struct {
-    uint16_t har_unlocked;          // bitmask: bit i = HAR i unlocked
-    uint8_t  har_stats[11][AP_STAT_COUNT]; // [har_id][AP_STAT_*]
+    uint16_t har_unlocked;                     // bitmask: bit i = HAR i unlocked
+    uint8_t  har_stats[11][AP_STAT_COUNT];     // [har_id][AP_STAT_*]
     uint8_t  pilot_stats[AP_PILOT_STAT_COUNT]; // [AP_PILOT_*]
+    uint8_t  tournament_access_count;          // 0=NAO only; 1=+Katushai; 2=+WAR; 3=all
+    uint8_t  extra_har_colors;                 // additional HAR color slots received
 } ap_items_t;
 
 // AP money accumulates from item callbacks; drained into pilot->money at mechlab entry.
@@ -39,10 +41,11 @@ typedef struct {
     int  buy_cost_factor; // 10-1000; divide by 100 for float multiplier
 } ap_seed_settings_t;
 
-// Save-persistent AP state (stored in CHR file).
+// Save-persistent AP state (written to .APS sidecar file alongside the .CHR save).
 typedef struct {
     uint32_t last_applied_item_index; // highest item.index where consumables were applied
     uint8_t  tournaments_won_mask;    // bitmask of which AP tournament indices (0-3) have been won
+    int32_t  har_money[11];           // per-HAR money wallets
 } ap_save_t;
 
 // Per-stat buy/train check counters — rebuilt from location history on each items_received.
@@ -59,9 +62,9 @@ typedef struct {
     int  match_offset;     // global match index of first match in this tournament
 } ap_tournament_state_t;
 
-// Match offsets per tournament (must match Locations.py pilot counts)
-// NAO=14, Katushai=14, WAR=14, World=35
-#define AP_TOURNAMENT_OFFSETS { 0, 14, 28, 42 }
+// Match offsets per tournament (must match Locations.py non-restricted pilot counts)
+// NAO=10, Katushai=11, WAR=11, World=28
+#define AP_TOURNAMENT_OFFSETS { 0, 10, 21, 32 }
 
 // Globals defined in apconnect.cpp; included by both C and C++ code.
 #ifdef __cplusplus

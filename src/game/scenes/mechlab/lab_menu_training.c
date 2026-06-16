@@ -17,9 +17,6 @@
 static component *label1;
 static component *label2;
 
-static int32_t prices[] = {50,   80,   120,   180,   240,   300,   450,   600,   800,   1100,   1500,   2500,
-                           4000, 7000, 10000, 14000, 20000, 28000, 40000, 55000, 75000, 100000, 140000, 200000};
-
 static void lab_menu_focus_power(component *c, bool focused, void *userdata);
 static void lab_menu_focus_agility(component *c, bool focused, void *userdata);
 static void lab_menu_focus_endurance(component *c, bool focused, void *userdata);
@@ -29,13 +26,16 @@ void lab_menu_training_power(component *c, void *userdata) {
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     pilot->money -= price;
-    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_POWER); } else {
+    /* AP */ if(ap_mode) {
+        ap_do_train(s, AP_PILOT_POWER);
+        ap_update_train_labels(512, level + 1);
+    } else {
         pilot->power++;
+        lab_menu_focus_power(c, true, userdata);
     }
     mechlab_update(s);
-    lab_menu_focus_power(c, true, userdata);
 }
 
 void lab_menu_training_check_power_price(component *c, void *userdata) {
@@ -48,7 +48,7 @@ void lab_menu_training_check_power_price(component *c, void *userdata) {
         component_disable(c, 1);
         return;
     }
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     component_disable(c, price > pilot->money);
 }
 
@@ -57,13 +57,16 @@ void lab_menu_training_agility(component *c, void *userdata) {
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     pilot->money -= price;
-    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_AGILITY); } else {
+    /* AP */ if(ap_mode) {
+        ap_do_train(s, AP_PILOT_AGILITY);
+        ap_update_train_labels(513, level + 1);
+    } else {
         pilot->agility++;
+        lab_menu_focus_agility(c, true, userdata);
     }
     mechlab_update(s);
-    lab_menu_focus_agility(c, true, userdata);
 }
 
 void lab_menu_training_check_agility_price(component *c, void *userdata) {
@@ -76,7 +79,7 @@ void lab_menu_training_check_agility_price(component *c, void *userdata) {
         component_disable(c, 1);
         return;
     }
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     component_disable(c, price > pilot->money);
 }
 
@@ -85,13 +88,16 @@ void lab_menu_training_endurance(component *c, void *userdata) {
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     pilot->money -= price;
-    /* AP */ if(ap_mode) { ap_do_train(s, AP_PILOT_ENDURANCE); } else {
+    /* AP */ if(ap_mode) {
+        ap_do_train(s, AP_PILOT_ENDURANCE);
+        ap_update_train_labels(514, level + 1);
+    } else {
         pilot->endurance++;
+        lab_menu_focus_endurance(c, true, userdata);
     }
     mechlab_update(s);
-    lab_menu_focus_endurance(c, true, userdata);
 }
 
 void lab_menu_training_check_endurance_price(component *c, void *userdata) {
@@ -104,7 +110,7 @@ void lab_menu_training_check_endurance_price(component *c, void *userdata) {
         component_disable(c, 1);
         return;
     }
-    int32_t price = prices[level];
+    int32_t price = ap_train_price(level);
     component_disable(c, price > pilot->money);
 }
 
@@ -126,19 +132,20 @@ static void lab_menu_focus_power(component *c, bool focused, void *userdata) {
         scene *s = userdata;
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        label_set_text(label1, lang_get(512));
         int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
-        int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-        if(level >= max_level) {
-            label_set_text(label2, "UNAVAILABLE");
+        /* AP */ if(ap_mode) {
+            ap_update_train_labels(512, level);
+            ap_focus_train(s, AP_PILOT_POWER);
         } else {
-            char tmp[32];
-            char price_str[16];
-            score_format(prices[level], price_str, sizeof(price_str));
-            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-            label_set_text(label2, tmp);
-        }
-        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_POWER); } else {
+            label_set_text(label1, lang_get(512));
+            if(level >= 23) {
+                label_set_text(label2, "UNAVAILABLE");
+            } else {
+                char tmp[32]; char price_str[16];
+                score_format(ap_train_price(level), price_str, sizeof(price_str));
+                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+                label_set_text(label2, tmp);
+            }
             mechlab_set_hint_wrapped(s, lang_get(533));
         }
     }
@@ -149,19 +156,20 @@ static void lab_menu_focus_agility(component *c, bool focused, void *userdata) {
         scene *s = userdata;
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        label_set_text(label1, lang_get(513));
         int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
-        int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-        if(level >= max_level) {
-            label_set_text(label2, "UNAVAILABLE");
+        /* AP */ if(ap_mode) {
+            ap_update_train_labels(513, level);
+            ap_focus_train(s, AP_PILOT_AGILITY);
         } else {
-            char tmp[32];
-            char price_str[16];
-            score_format(prices[level], price_str, sizeof(price_str));
-            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-            label_set_text(label2, tmp);
-        }
-        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_AGILITY); } else {
+            label_set_text(label1, lang_get(513));
+            if(level >= 23) {
+                label_set_text(label2, "UNAVAILABLE");
+            } else {
+                char tmp[32]; char price_str[16];
+                score_format(ap_train_price(level), price_str, sizeof(price_str));
+                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+                label_set_text(label2, tmp);
+            }
             mechlab_set_hint_wrapped(s, lang_get(534));
         }
     }
@@ -172,19 +180,20 @@ static void lab_menu_focus_endurance(component *c, bool focused, void *userdata)
         scene *s = userdata;
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        label_set_text(label1, lang_get(514));
         int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
-        int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-        if(level >= max_level) {
-            label_set_text(label2, "UNAVAILABLE");
+        /* AP */ if(ap_mode) {
+            ap_update_train_labels(514, level);
+            ap_focus_train(s, AP_PILOT_ENDURANCE);
         } else {
-            char tmp[32];
-            char price_str[16];
-            score_format(prices[level], price_str, sizeof(price_str));
-            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-            label_set_text(label2, tmp);
-        }
-        /* AP */ if(ap_mode) { ap_focus_train(s, AP_PILOT_ENDURANCE); } else {
+            label_set_text(label1, lang_get(514));
+            if(level >= 23) {
+                label_set_text(label2, "UNAVAILABLE");
+            } else {
+                char tmp[32]; char price_str[16];
+                score_format(ap_train_price(level), price_str, sizeof(price_str));
+                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+                label_set_text(label2, tmp);
+            }
             mechlab_set_hint_wrapped(s, lang_get(535));
         }
     }
@@ -245,6 +254,8 @@ component *lab_menu_training_create(scene *s) {
     component_set_size_hints(label2, 90, 110);
     component_set_pos_hints(label2, 200, 186);
     trnmenu_attach(menu, label2);
+
+    /* AP */ ap_register_train_labels(label1, label2);
 
     // Bind hand animation
     trnmenu_bind_hand(menu, hand_of_doom, s->gs);

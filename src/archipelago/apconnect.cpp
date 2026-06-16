@@ -18,6 +18,7 @@ extern "C" {
 #include "apconnect.h"
 #include "apitems.h"
 #include "apstate.h"
+#include "resources/resource_files.h"
 #include "utils/log.h"
 }
 
@@ -84,6 +85,11 @@ static void apply_item_idempotent(int64_t id) {
                 APItems.pilot_stats[stat] = (uint8_t)(cur + 1);
             }
         }
+    } else if (id == AP_ITEM_TOURNAMENT_ACCESS) {
+        if (APItems.tournament_access_count < 3)
+            APItems.tournament_access_count++;
+    } else if (id == AP_ITEM_HAR_COLOR) {
+        APItems.extra_har_colors++;
     }
 }
 
@@ -95,7 +101,7 @@ static void apply_item_consumable(int64_t id) {
         APStats.pending_money += AP_MONEY_LARGE_VALUE;
         log_debug("AP - money large: pending=%d", APStats.pending_money);
     }
-    // AP_ITEM_NOTHING: no-op
+    // AP_ITEM_HAR_COLOR and AP_ITEM_TOURNAMENT_ACCESS are idempotent progressives, not consumables
 }
 
 // ----- Handlers -----
@@ -196,11 +202,13 @@ extern "C" void Archipelago_Connect(const char *uri, const char *slot, const cha
     g_status = APCONN_CONNECTING;
     ap_mode  = false;
 
-    std::string uuid = ap_get_uuid("openomf");
+    std::string uuid     = ap_get_uuid("openomf");
+    std::string slot_str = slot     ? slot     : "";
+    std::string pass_str = password ? password : "";
     ap = std::make_unique<APClient>(uuid, "One Must Fall: 2097", uri);
 
     ap->set_room_info_handler([=]() {
-        ap->ConnectSlot(slot, password ? password : "",
+        ap->ConnectSlot(slot_str, pass_str,
                         0b111 /* ITEMS_HANDLING_ALL */, {}, {0, 6, 0});
     });
     ap->set_slot_connected_handler(on_slot_connected);
@@ -271,4 +279,59 @@ extern "C" void Archipelago_SetBuyHintCallback(void (*cb)(int64_t location_id, c
 
 extern "C" void Archipelago_SetItemsDoneCallback(void (*cb)(void)) {
     g_items_done_cb = cb;
+}
+
+extern "C" void Archipelago_GetSaveIdent(char *out, size_t len) {
+    if (!ap || !len) return;
+    std::string key = ap->get_seed() + '\0' + ap->get_slot();
+    uint32_t h = 2166136261u;
+    for (unsigned char c : key) { h ^= c; h *= 16777619u; }
+    snprintf(out, len, "AP%08X", (unsigned)h);
+}
+
+extern "C" void Archipelago_GetSlotName(char *out, size_t len) {
+    if (!ap || !len) return;
+    snprintf(out, len, "%s", ap->get_slot().c_str());
+}
+
+extern "C" void Archipelago_APSaveState(const char *ident) {
+    path save = get_ap_save_directory();
+    path_append(&save, ident);
+    path_set_ext(&save, ".APS");
+    FILE *f = fopen(path_c(&save), "wb");
+    if (!f) { log_error("AP - can't write state %s", path_c(&save)); return; }
+    const uint8_t magic[4] = {'A','P','S','T'};
+    const uint8_t version  = 1;
+    fwrite(magic,                           1,             4,  f);
+    fwrite(&version,                        1,             1,  f);
+    fwrite(APSave.har_money,                sizeof(int32_t), 11, f);
+    fwrite(&APSave.last_applied_item_index, sizeof(uint32_t), 1,  f);
+    fwrite(&APSave.tournaments_won_mask,    sizeof(uint8_t),  1,  f);
+    fclose(f);
+    log_debug("AP - state saved: %s (last_idx=%u)", path_c(&save), APSave.last_applied_item_index);
+}
+
+extern "C" bool Archipelago_APLoadState(const char *ident) {
+    path save = get_ap_save_directory();
+    path_append(&save, ident);
+    path_set_ext(&save, ".APS");
+    FILE *f = fopen(path_c(&save), "rb");
+    if (!f) { log_debug("AP - no state file: %s", path_c(&save)); return false; }
+    uint8_t magic[4] = {};
+    uint8_t version  = 0;
+    fread(magic,    1, 4, f);
+    fread(&version, 1, 1, f);
+    if (memcmp(magic, "APST", 4) != 0) {
+        log_error("AP - bad magic in state file %s", path_c(&save));
+        fclose(f);
+        return false;
+    }
+    if (version >= 1) {
+        fread(APSave.har_money,                sizeof(int32_t),  11, f);
+        fread(&APSave.last_applied_item_index, sizeof(uint32_t), 1,  f);
+        fread(&APSave.tournaments_won_mask,    sizeof(uint8_t),  1,  f);
+    }
+    fclose(f);
+    log_debug("AP - state loaded: %s (last_idx=%u)", path_c(&save), APSave.last_applied_item_index);
+    return true;
 }

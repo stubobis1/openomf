@@ -66,6 +66,7 @@ void lab_menu_customize_done(component *c, void *userdata) {
 }
 
 void lab_menu_customize_color_main(component *c, void *userdata) {
+    /* AP */ if(ap_mode && APItems.extra_har_colors == 0) return;
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot_set_player_color(&p1->chr->pilot, PRIMARY, (p1->chr->pilot.color_1 + 1) % 17);
@@ -73,6 +74,7 @@ void lab_menu_customize_color_main(component *c, void *userdata) {
 }
 
 void lab_menu_customize_color_secondary(component *c, void *userdata) {
+    /* AP */ if(ap_mode && APItems.extra_har_colors == 0) return;
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot_set_player_color(&p1->chr->pilot, SECONDARY, (p1->chr->pilot.color_2 + 1) % 17);
@@ -80,6 +82,7 @@ void lab_menu_customize_color_secondary(component *c, void *userdata) {
 }
 
 void lab_menu_customize_color_third(component *c, void *userdata) {
+    /* AP */ if(ap_mode && APItems.extra_har_colors == 0) return;
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot_set_player_color(&p1->chr->pilot, TERTIARY, (p1->chr->pilot.color_3 + 1) % 17);
@@ -95,6 +98,8 @@ void lab_menu_customize_arm_power(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * arm_leg_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_ARM_POWER);
+        ap_update_buy_har_labels(pilot, AP_STAT_ARM_POWER, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price =
             har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->arm_power] * arm_leg_multiplier;
@@ -142,6 +147,8 @@ void lab_menu_customize_leg_power(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * arm_leg_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_LEG_POWER);
+        ap_update_buy_har_labels(pilot, AP_STAT_LEG_POWER, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price =
             har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->leg_power] * arm_leg_multiplier;
@@ -189,6 +196,8 @@ void lab_menu_customize_arm_speed(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * arm_leg_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_ARM_SPEED);
+        ap_update_buy_har_labels(pilot, AP_STAT_ARM_SPEED, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price =
             har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->arm_speed] * arm_leg_multiplier;
@@ -236,6 +245,8 @@ void lab_menu_customize_leg_speed(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * arm_leg_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_LEG_SPEED);
+        ap_update_buy_har_labels(pilot, AP_STAT_LEG_SPEED, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price =
             har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->leg_speed] * arm_leg_multiplier;
@@ -283,6 +294,8 @@ void lab_menu_customize_armor(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * armor_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_ARMOR);
+        ap_update_buy_har_labels(pilot, AP_STAT_ARMOR, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->armor] * armor_multiplier;
         if(price > 0) {
@@ -328,6 +341,8 @@ void lab_menu_customize_stun_resistance(component *c, void *userdata) {
         int32_t vanilla = har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[buy_level + 1] * stun_res_multiplier;
         pilot->money -= ap_buy_price(vanilla, buy_level + 1);
         ap_do_buy_har(s, pilot->har_id, AP_STAT_STUN_RESIST);
+        ap_update_buy_har_labels(pilot, AP_STAT_STUN_RESIST, buy_level + 1);
+        return;
     } else if(mechlab_get_selling(s)) {
         int32_t price =
             har_upgrade_price[pilot->har_id] * upgrade_level_multiplier[pilot->stun_resistance] * stun_res_multiplier;
@@ -846,6 +861,8 @@ component *lab_menu_customize_create(scene *s) {
     component_set_size_hints(details_label, 90, 80);
     component_set_pos_hints(details_label, 210, 158);
     trnmenu_attach(menu, details_label);
+
+    /* AP */ ap_register_buy_labels(header_label, details_label);
 
     // Bind hand animation
     trnmenu_bind_hand(menu, hand_of_doom, s->gs);

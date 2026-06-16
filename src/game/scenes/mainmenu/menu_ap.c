@@ -3,6 +3,8 @@
 #include "archipelago/apconnect.h"
 #include "game/game_state.h"
 #include "game/gui/gui.h"
+#include "game/gui/label.h"
+#include "game/gui/text/text.h"
 #include "game/protos/scene.h"
 #include "game/utils/settings.h"
 #include "resources/ids.h"
@@ -18,8 +20,10 @@ typedef struct {
     component *server_input;
     component *slot_input;
     component *pass_input;
+    component *status_label;
     component *connect_button;
     component *cancel_button;
+    ap_connection_status_t last_status;
     scene     *s;
 } ap_menu_data;
 
@@ -29,9 +33,33 @@ static void menu_ap_free(component *c) {
     menu_set_userdata(c, NULL);
 }
 
+static void menu_ap_update_status(ap_menu_data *local, ap_connection_status_t status) {
+    if(status == local->last_status) return;
+    local->last_status = status;
+    switch(status) {
+        case APCONN_NOT_CONNECTED:
+            label_set_text(local->status_label, "");
+            break;
+        case APCONN_CONNECTING:
+            label_set_text(local->status_label, "CONNECTING...");
+            label_set_text_color(local->status_label, TEXT_YELLOW);
+            break;
+        case APCONN_READY:
+            label_set_text(local->status_label, "CONNECTED!");
+            label_set_text_color(local->status_label, TEXT_BRIGHT_GREEN);
+            break;
+        case APCONN_FATAL_ERROR:
+            label_set_text(local->status_label, "CONNECTION FAILED");
+            label_set_text_color(local->status_label, 0xF6);
+            break;
+    }
+}
+
 static void menu_ap_tick(component *c) {
     ap_menu_data *local = menu_get_userdata(c);
     ap_connection_status_t status = Archipelago_ConnectionStatus();
+
+    menu_ap_update_status(local, status);
 
     if(status == APCONN_READY) {
         // Persist settings
@@ -55,6 +83,8 @@ static void menu_ap_tick(component *c) {
         component_disable(local->slot_input, 0);
         component_disable(local->pass_input, 0);
         menu_select(c, local->connect_button);
+        // Reset last_status so the label updates again on next tick after disconnect
+        local->last_status = APCONN_FATAL_ERROR;
     }
 }
 
@@ -100,7 +130,6 @@ component *menu_ap_create(scene *s) {
 
     component *menu = menu_create();
     menu_attach(menu, label_create_title("ARCHIPELAGO"));
-    menu_attach(menu, filler_create());
 
     local->server_input = textinput_create(AP_SERVER_MAX_LEN,
         "Archipelago server address and port (host:port).",
@@ -116,11 +145,16 @@ component *menu_ap_create(scene *s) {
     textinput_set_font(local->slot_input,   FONT_BIG);
     textinput_set_font(local->pass_input,   FONT_BIG);
 
+    local->status_label   = label_create("");
+    label_set_text_horizontal_align(local->status_label, TEXT_ALIGN_CENTER);
+    component_set_size_hints(local->status_label, -1, 11); // reserve one line even when empty
+    local->last_status    = APCONN_NOT_CONNECTED;
     local->connect_button = button_create("CONNECT", "Connect to the Archipelago server.",
                                           false, false, menu_ap_connect, s);
     local->cancel_button  = button_create("CANCEL",  "Return to main menu.",
                                           false, false, menu_ap_cancel, s);
 
+    menu_attach(menu, local->status_label);
     menu_attach(menu, local->server_input);
     menu_attach(menu, local->slot_input);
     menu_attach(menu, local->pass_input);

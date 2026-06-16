@@ -5,6 +5,7 @@
 #include <string.h>
 
 /* AP */ #include "archipelago/ap_mechlab.h"
+/* AP */ #include "archipelago/apconnect.h"
 /* AP */ #include "archipelago/apstate.h"
 #include "formats/error.h"
 #include "formats/tournament.h"
@@ -116,6 +117,76 @@ bool mechlab_find_last_player(scene *scene) {
     return true;
 }
 
+static bool mechlab_find_ap_player(scene *scene) {
+    mechlab_local *local = scene_get_userdata(scene);
+    game_player *p1 = game_state_get_player(scene->gs, 0);
+
+    char ident[12] = "";
+    Archipelago_GetSaveIdent(ident, sizeof(ident));
+    char slot_name[18] = "";
+    Archipelago_GetSlotName(slot_name, sizeof(slot_name));
+    log_debug("AP: save ident '%s' slot '%s'", ident, slot_name);
+
+    /* AP */ Archipelago_APLoadState(ident);
+
+    int har_id = (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10)
+                     ? APSeedSettings.starting_har : 0;
+
+    sd_chr_file *chr = omf_calloc(1, sizeof(sd_chr_file));
+    int ret = sg_load_ap_pilot(chr, ident);
+    if(ret != SD_SUCCESS) {
+        // First run for this seed+slot: no valid CHR exists yet.
+        // Set pilot fields on the pre-existing pilot; a proper CHR (with photo/enemies)
+        // will be created when the player enters their first tournament.
+        omf_free(chr);
+        p1->pilot->har_id = har_id;
+        p1->pilot->money = APSave.har_money[har_id];
+        strncpy(p1->pilot->name, slot_name, 17);
+        p1->pilot->name[17] = '\0';
+        log_debug("AP: first run, ident '%s' har %d money %d", ident, har_id, p1->pilot->money);
+    } else {
+        log_debug("AP: loaded save '%s'", ident);
+        p1->chr = chr;
+        sd_pilot *old_pilot = game_player_get_pilot(p1);
+        if(&chr->pilot != old_pilot) {
+            game_player_set_pilot(p1, &chr->pilot);
+        }
+        har_id = p1->pilot->har_id;
+        p1->pilot->money = APSave.har_money[har_id];
+        // Always use the current slot name — saves may have stored the hash.
+        strncpy(p1->pilot->name, slot_name, 17);
+        p1->pilot->name[17] = '\0';
+        // Restore tournament state from trn_name stored in the pilot.
+        if(p1->pilot->trn_name[0] != '\0') {
+            static const int ap_offsets[] = AP_TOURNAMENT_OFFSETS;
+            int tidx = -1;
+            if(strncmp(p1->pilot->trn_name, "NORTH_AM", 8) == 0) tidx = 0;
+            else if(strncmp(p1->pilot->trn_name, "KATUSHAI", 8) == 0) tidx = 1;
+            else if(strncmp(p1->pilot->trn_name, "WAR", 3) == 0) tidx = 2;
+            else if(strncmp(p1->pilot->trn_name, "WORLD", 5) == 0)    tidx = 3;
+            if(tidx >= 0) {
+                APTournament.tournament_idx = tidx;
+                APTournament.match_offset   = ap_offsets[tidx];
+                log_debug("AP: restored tournament %d (offset %d) from trn_name '%s'",
+                          tidx, ap_offsets[tidx], p1->pilot->trn_name);
+            }
+        }
+    }
+
+    // Always create the mech display object so the starting HAR is visible.
+    animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + har_id)->ani;
+    object_free(local->mech);
+    omf_free(local->mech);
+    local->mech = omf_calloc(1, sizeof(object));
+    object_create(local->mech, scene->gs, vec2i_create(0, 0), vec2f_create(0, 0));
+    object_set_animation(local->mech, initial_har_ani);
+    object_set_repeat(local->mech, 1);
+    object_dynamic_tick(local->mech);
+
+    local->dashtype = DASHBOARD_NONE;
+    return true;
+}
+
 void mechlab_load_har(scene *scene, sd_pilot *pilot) {
     mechlab_local *local = scene_get_userdata(scene);
     animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + pilot->har_id)->ani;
@@ -200,8 +271,18 @@ void mechlab_free(scene *scene) {
 
     game_player *player1 = game_state_get_player(scene->gs, 0);
     // save the character file
-    if(player1->chr != NULL && sg_save(player1->chr) != SD_SUCCESS) {
-        log_error("Failed to save pilot %s", player1->chr->pilot.name);
+    if(player1->chr != NULL) {
+        char ap_ident[12] = "";
+        /* AP */ if(ap_mode) {
+        /* AP */     Archipelago_GetSaveIdent(ap_ident, sizeof(ap_ident));
+        /* AP */     int har = player1->pilot->har_id;
+        /* AP */     if(har >= 0 && har < 11) APSave.har_money[har] = player1->pilot->money;
+        /* AP */     Archipelago_APSaveState(ap_ident);
+        /* AP */ }
+        int save_ret = ap_mode ? sg_save_ap(player1->chr, ap_ident) : sg_save(player1->chr);
+        if(save_ret != SD_SUCCESS) {
+            log_error("Failed to save pilot %s", player1->chr->pilot.name);
+        }
     }
 
     for(unsigned i = 0; i < N_ELEMENTS(local->bg_obj); i++) {
@@ -365,10 +446,10 @@ void mechlab_tick(scene *scene, int paused) {
                 player1->pilot->money = player1->pilot->money - trn->registration_fee;
             }
             if(ap_mode) {
-                // Map TRN filename to AP tournament index (0=NAO,1=Katushai,2=WAR,3=World).
+                // Map TRN filename to AP tournament index (0=NORTH_AM,1=Katushai,2=WAR,3=World).
                 static const int ap_offsets[] = AP_TOURNAMENT_OFFSETS;
                 int tidx = -1;
-                if(strncmp(trn->filename, "NAO", 3) == 0)      tidx = 0;
+                if(strncmp(trn->filename, "NORTH_AM", 8) == 0) tidx = 0;
                 else if(strncmp(trn->filename, "KATUSHAI", 8) == 0) tidx = 1;
                 else if(strncmp(trn->filename, "WAR", 3) == 0) tidx = 2;
                 else if(strncmp(trn->filename, "WORLD", 5) == 0)    tidx = 3;
@@ -394,15 +475,25 @@ void mechlab_tick(scene *scene, int paused) {
                 omf_free(oldchr);
             }
 
-            if(sg_save(player1->chr) != SD_SUCCESS) {
-                log_error("Failed to save pilot %s", player1->chr->pilot.name);
+            {
+                char ap_ident[12] = "";
+                /* AP */ if(ap_mode) {
+                /* AP */     Archipelago_GetSaveIdent(ap_ident, sizeof(ap_ident));
+                /* AP */     int har = player1->chr->pilot.har_id;
+                /* AP */     if(har >= 0 && har < 11) APSave.har_money[har] = player1->chr->pilot.money;
+                /* AP */     Archipelago_APSaveState(ap_ident);
+                /* AP */ }
+                int save_ret = ap_mode ? sg_save_ap(player1->chr, ap_ident) : sg_save(player1->chr);
+                if(save_ret != SD_SUCCESS) {
+                    log_error("Failed to save pilot %s", player1->chr->pilot.name);
+                }
             }
             // force the character to reload because its just easier
 
             sd_chr_free(player1->chr);
             omf_free(player1->chr);
 
-            bool found = mechlab_find_last_player(scene);
+            bool found = ap_mode ? mechlab_find_ap_player(scene) : mechlab_find_last_player(scene);
             mechlab_select_dashboard(scene, DASHBOARD_STATS);
             gui_frame_free(local->frame);
             gui_theme theme;
@@ -668,9 +759,13 @@ int mechlab_create(scene *scene) {
     component_layout(local->hint, 32, 131, 248, 13);
 
     scene_set_userdata(scene, local);
-    bool found = mechlab_find_last_player(scene);
-
-    /* AP */ if(ap_mode) ap_mechlab_attach(scene);
+    bool found;
+    /* AP */ if(ap_mode) {
+    /* AP */     found = mechlab_find_ap_player(scene); // must run first to set correct pilot
+    /* AP */     ap_mechlab_attach(scene);              // drain/sync land on the right pilot
+    /* AP */ } else {
+                 found = mechlab_find_last_player(scene);
+    /* AP */ }
 
     mechlab_select_dashboard(scene, DASHBOARD_STATS);
 

@@ -40,6 +40,20 @@ void Archipelago_SetBuyHintCallback(void (*cb)(int64_t location_id, const char *
 // Fires after all per-item callbacks, so APItems and APChecks are fully rebuilt.
 void Archipelago_SetItemsDoneCallback(void (*cb)(void));
 
+// Write a deterministic save-file identifier derived from the current seed + slot
+// into out (up to len bytes, including NUL). Format: "AP" + 8 uppercase hex digits.
+// Must be called after the slot is connected.
+void Archipelago_GetSaveIdent(char *out, size_t len);
+
+// Write the connected slot name into out (up to len bytes, including NUL).
+void Archipelago_GetSlotName(char *out, size_t len);
+
+// Persist APSave (har_money, last_applied_item_index, tournaments_won_mask) to <ident>.APS.
+void Archipelago_APSaveState(const char *ident);
+
+// Load APSave from <ident>.APS. Returns true on success, false if the file doesn't exist.
+bool Archipelago_APLoadState(const char *ident);
+
 #ifdef __cplusplus
 }
 #endif

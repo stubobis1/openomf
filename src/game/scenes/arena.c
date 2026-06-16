@@ -33,6 +33,7 @@
 #include "game/utils/settings.h"
 #include "game/utils/ticktimer.h"
 /* AP */ #include "archipelago/ap_mechlab.h"
+/* AP */ #include "archipelago/apconnect.h"
 /* AP */ #include "archipelago/apstate.h"
 #include "resources/languages.h"
 #include "resources/sgmanager.h"
@@ -396,8 +397,18 @@ static void arena_end(scene *sc) {
             fight_stats->plug_text = PLUG_LOSE + rand_int(5);
         }
 
-        if(p1->chr && sg_save(p1->chr) != SD_SUCCESS) {
-            log_error("Failed to save pilot %s", p1->chr->pilot.name);
+        if(p1->chr) {
+            char ap_ident[12] = "";
+            /* AP */ if(ap_mode) {
+            /* AP */     Archipelago_GetSaveIdent(ap_ident, sizeof(ap_ident));
+            /* AP */     int har = p1->pilot->har_id;
+            /* AP */     if(har >= 0 && har < 11) APSave.har_money[har] = p1->pilot->money;
+            /* AP */     Archipelago_APSaveState(ap_ident);
+            /* AP */ }
+            int save_ret = ap_mode ? sg_save_ap(p1->chr, ap_ident) : sg_save(p1->chr);
+            if(save_ret != SD_SUCCESS) {
+                log_error("Failed to save pilot %s", p1->chr->pilot.name);
+            }
         }
         if(is_demoplay(gs)) {
             game_state_set_next(gs, SCENE_VS);

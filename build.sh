@@ -30,7 +30,9 @@ rm -f "$BUILD/lib/libssl.so"* "$BUILD/lib/libcrypto.so"*
 rm -f "$BUILD/lib/libglib-2.0.so"* "$BUILD/lib/libgmodule-2.0.so"* "$BUILD/lib/libgobject-2.0.so"*
 
 # Game data: symlink OMF2097 files into resources/
+# Try XDG_DATA_HOME first, fall back to the standard ~/.local/share location.
 OMF2097="${XDG_DATA_HOME:-$HOME/.local/share}/OpenOMF/OMF2097"
+[ -d "$OMF2097" ] || OMF2097="$HOME/.local/share/OpenOMF/OMF2097"
 if [ -d "$OMF2097" ]; then
   for f in "$OMF2097"/*; do
     base="$(basename "$f")"

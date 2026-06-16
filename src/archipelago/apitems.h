@@ -17,10 +17,13 @@
 // Pilot stat progressive items: BASE + 200 + stat
 #define AP_ITEM_PILOT_STAT(stat_idx)  (AP_BASE_ID + 200 + (stat_idx))
 
-// Filler items
-#define AP_ITEM_MONEY_SMALL  (AP_BASE_ID + 300)
-#define AP_ITEM_MONEY_LARGE  (AP_BASE_ID + 301)
-#define AP_ITEM_NOTHING      (AP_BASE_ID + 302)
+// Filler / miscellaneous items
+#define AP_ITEM_MONEY_SMALL         (AP_BASE_ID + 300)
+#define AP_ITEM_MONEY_LARGE         (AP_BASE_ID + 301)
+#define AP_ITEM_HAR_COLOR           (AP_BASE_ID + 302)
+
+// Progressive tournament access (3 copies unlock Katushai=1, WAR=2, World=3)
+#define AP_ITEM_TOURNAMENT_ACCESS   (AP_BASE_ID + 500)
 
 // --- Location IDs ---
 
@@ -29,10 +32,10 @@
 #define ap_match_location_id(global_idx) \
     (AP_LOC_MATCH_BASE + (int64_t)(global_idx))
 
-// Tournament win locations: BASE + 2000 + tournament_idx
+// Tournament win locations: BASE + 2000 + tournament_idx*3 + reward_idx (0-2)
 #define AP_LOC_WIN_BASE      (AP_BASE_ID + 2000)
-#define ap_tournament_win_id(tournament_idx) \
-    (AP_LOC_WIN_BASE + (int64_t)(tournament_idx))
+#define ap_tournament_win_id(tournament_idx, reward_idx) \
+    (AP_LOC_WIN_BASE + (int64_t)(tournament_idx) * 3 + (int64_t)(reward_idx))
 
 // HAR buy locations: BASE + 3000 + har*120 + stat*20 + (level-1)
 // stride: 6 stats * 20 level ceiling = 120 per HAR
