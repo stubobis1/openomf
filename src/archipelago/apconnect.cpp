@@ -93,13 +93,23 @@ static void apply_item_idempotent(int64_t id) {
     }
 }
 
+// Prize money scales with the highest tournament currently accessible.
+// Ratios mirror registration fees: NAO=1500, Katushai=3000, WAR=5000, World=10000.
+static const int AP_TOURNAMENT_MONEY_MULT[4] = { 1, 2, 3, 6 };
+
 static void apply_item_consumable(int64_t id) {
-    if (id == AP_ITEM_MONEY_SMALL) {
-        APStats.pending_money += AP_MONEY_SMALL_VALUE;
-        log_debug("AP - money small: pending=%d", APStats.pending_money);
-    } else if (id == AP_ITEM_MONEY_LARGE) {
-        APStats.pending_money += AP_MONEY_LARGE_VALUE;
-        log_debug("AP - money large: pending=%d", APStats.pending_money);
+    if (id == AP_ITEM_MONEY_SMALL || id == AP_ITEM_MONEY_LARGE) {
+        int t = (int)APItems.tournament_access_count;
+        if (t > 3) t = 3;
+        int t_mult = AP_TOURNAMENT_MONEY_MULT[t];
+        int32_t base = (id == AP_ITEM_MONEY_SMALL)
+                           ? APSeedSettings.money_small_value
+                           : APSeedSettings.money_large_value;
+        int32_t award = (int32_t)((int64_t)base * t_mult);
+        APStats.pending_money += award;
+        log_debug("AP - money %s: base=%d t_mult=%d award=%d pending=%d",
+                  (id == AP_ITEM_MONEY_SMALL) ? "small" : "large",
+                  base, t_mult, award, APStats.pending_money);
     }
     // AP_ITEM_HAR_COLOR and AP_ITEM_TOURNAMENT_ACCESS are idempotent progressives, not consumables
 }
@@ -181,6 +191,12 @@ static void on_slot_connected(const json& slot_data) {
         APSeedSettings.include_buy = slot_data["include_buy"].get<bool>();
     if (slot_data.contains("buy_cost_factor"))
         APSeedSettings.buy_cost_factor = slot_data["buy_cost_factor"].get<int>();
+    APSeedSettings.money_small_value = AP_MONEY_SMALL_VALUE;
+    APSeedSettings.money_large_value = AP_MONEY_LARGE_VALUE;
+    if (slot_data.contains("money_small_value"))
+        APSeedSettings.money_small_value = slot_data["money_small_value"].get<int>();
+    if (slot_data.contains("money_large_value"))
+        APSeedSettings.money_large_value = slot_data["money_large_value"].get<int>();
 
     // Mark starting HAR as unlocked — it's precollected on server but we still need it locally.
     if (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10) {

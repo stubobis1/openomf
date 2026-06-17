@@ -60,6 +60,6 @@
 #define AP_TOURNAMENT_WORLD_CHAMPIONSHIP  3
 #define AP_TOURNAMENT_ALL                 4
 
-// Money bundle values (in game credits)
-#define AP_MONEY_SMALL_VALUE  1000
-#define AP_MONEY_LARGE_VALUE  5000
+// Money bundle values (in game credits). 
+#define AP_MONEY_SMALL_VALUE  3000
+#define AP_MONEY_LARGE_VALUE  15000

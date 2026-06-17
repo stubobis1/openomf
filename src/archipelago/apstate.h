@@ -38,7 +38,9 @@ typedef struct {
     int  har_stat_max;    // max upgrade levels per HAR stat
     int  pilot_stat_max;  // max upgrade levels per pilot stat
     bool include_buy;
-    int  buy_cost_factor; // 10-1000; divide by 100 for float multiplier
+    int  buy_cost_factor;  // 10-1000; divide by 100 for float multiplier
+    int  money_small_value; // base credits for Money - Small (after factor; default AP_MONEY_SMALL_VALUE)
+    int  money_large_value; // base credits for Money - Large (after factor; default AP_MONEY_LARGE_VALUE)
 } ap_seed_settings_t;
 
 // Save-persistent AP state (written to .APS sidecar file alongside the .CHR save).
