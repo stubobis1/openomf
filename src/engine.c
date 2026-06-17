@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "archipelago/apconnect.h"
 #include "audio/audio.h"
 #include "console/console.h"
 #include "controller/controller.h"
@@ -322,6 +323,9 @@ void engine_run(const engine_init_flags *init_flags) {
                 SDL_ShowCursor(0);
             }
         }
+
+        // Poll AP connection every frame to process incoming packets.
+        Archipelago_Poll();
 
         // Render scene
         uint64_t frame_dt = SDL_GetTicks64() - frame_start;

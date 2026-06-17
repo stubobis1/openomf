@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "archipelago/ap_mechlab.h"
+#include "archipelago/apstate.h"
 #include "controller/controller.h"
 #include "formats/tournament.h"
 #include "game/gui/label.h"
@@ -111,6 +113,9 @@ sd_tournament_file *trnselect_selected(component *c) {
 static void trnselect_init(component *c, const gui_theme *theme) {
     trnselect *local = widget_get_obj(c);
     trnlist_init(&local->tournaments);
+    if(ap_mode) {
+        ap_filter_trnlist(&local->tournaments);
+    }
     local->img = omf_calloc(1, sizeof(sprite));
     local->label = NULL;
 

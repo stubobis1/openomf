@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+/* AP */ #include "archipelago/apstate.h"
 #include "formats/chr.h"
 #include "game/common_defines.h"
 #include "game/gui/sizer.h"
@@ -261,10 +262,17 @@ void lab_menu_tick_in_tournament(component *c, void *userdata) {
 static void lab_menu_tick_chr_loaded(component *c, void *userdata) {
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
-    if(p1->chr) {
+    if(ap_mode || p1->chr) {
         component_disable(c, 0);
         c->supports_select = true;
     } else {
+        component_disable(c, 1);
+        c->supports_select = false;
+    }
+}
+
+static void lab_menu_tick_ap_disabled(component *c, void *userdata) {
+    if(ap_mode) {
         component_disable(c, 1);
         c->supports_select = false;
     }
@@ -274,10 +282,10 @@ static const spritebutton_tick_cb tick_cbs[] = {
     lab_menu_tick_arena,         // lab_menu_tick_arena,
     lab_menu_tick_in_tournament, // lab_menu_tick_training,
     lab_menu_tick_in_tournament, // lab_menu_tick_buy,
-    lab_menu_tick_in_tournament, // lab_menu_tick_sell,
-    NULL,                        // lab_menu_tick_load,
-    NULL,                        // lab_menu_tick_new,
-    NULL,                        // lab_menu_tick_delete,
+    lab_menu_tick_ap_disabled,   // lab_menu_tick_sell,
+    lab_menu_tick_ap_disabled,   // lab_menu_tick_load,
+    lab_menu_tick_ap_disabled,   // lab_menu_tick_new,
+    lab_menu_tick_ap_disabled,   // lab_menu_tick_delete,
     lab_menu_tick_in_tournament, // lab_menu_tick_sim,
     NULL,                        // lab_menu_tick_quit,
     lab_menu_tick_chr_loaded,    // lab_menu_tick_tournament,

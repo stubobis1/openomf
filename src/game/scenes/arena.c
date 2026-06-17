@@ -32,6 +32,9 @@
 #include "game/utils/score.h"
 #include "game/utils/settings.h"
 #include "game/utils/ticktimer.h"
+/* AP */ #include "archipelago/ap_mechlab.h"
+/* AP */ #include "archipelago/apconnect.h"
+/* AP */ #include "archipelago/apstate.h"
 #include "resources/languages.h"
 #include "resources/sgmanager.h"
 #include "utils/allocator.h"
@@ -356,6 +359,19 @@ static void arena_end(scene *sc) {
             fight_stats->hit_miss_ratio[1] = 100 * fight_stats->hits_landed[1] / fight_stats->total_attacks[1];
         }
         if(fight_stats->winner == 0) {
+            /* AP */ if(ap_mode && is_tournament(gs) && p1->chr) {
+                int count = p1->chr->pilot.enemies_inc_unranked;
+                for(int k = 0; k < count; k++) {
+                    sd_chr_enemy *enemy = p1->chr->enemies[k];
+                    if(enemy && &enemy->pilot == p2->pilot) {
+                        ap_on_match_win(enemy->trn_index);
+                        break;
+                    }
+                }
+                if(p1->pilot->money < 0) {
+                    p1->pilot->money = 0;
+                }
+            }
             int16_t hp_left_percent = har_health_percent(p1_har);
             // check if this is an unranked challenger with an enhancement we don't have
             if(p2->pilot->rank == 0 && fight_stats->finish == FINISH_DESTRUCTION &&
@@ -369,20 +385,30 @@ static void arena_end(scene *sc) {
             } else {
                 fight_stats->plug_text = PLUG_WIN + rand_int(3);
             }
-        } else if(p1->pilot->money < 0 && sell_highest_value_upgrade(p1->pilot, fight_stats->sold)) {
+        } else if(!ap_mode && p1->pilot->money < 0 && sell_highest_value_upgrade(p1->pilot, fight_stats->sold)) {
             fight_stats->plug_text = PLUG_SOLD_UPGRADE;
-        } else if(warning_given && p1->pilot->money < 0) {
+        } else if(!ap_mode && warning_given && p1->pilot->money < 0) {
             fight_stats->plug_text = PLUG_KICK_OUT;
             p1->pilot->money = 0;
             sd_pilot_exit_tournament(p1->pilot);
-        } else if(p1->pilot->money < 0) {
+        } else if(!ap_mode && p1->pilot->money < 0) {
             fight_stats->plug_text = PLUG_WARNING;
         } else {
             fight_stats->plug_text = PLUG_LOSE + rand_int(5);
         }
 
-        if(p1->chr && sg_save(p1->chr) != SD_SUCCESS) {
-            log_error("Failed to save pilot %s", p1->chr->pilot.name);
+        if(p1->chr) {
+            char ap_ident[12] = "";
+            /* AP */ if(ap_mode) {
+            /* AP */     Archipelago_GetSaveIdent(ap_ident, sizeof(ap_ident));
+            /* AP */     int har = p1->pilot->har_id;
+            /* AP */     if(har >= 0 && har < 11) APSave.har_money[har] = p1->pilot->money;
+            /* AP */     Archipelago_APSaveState(ap_ident);
+            /* AP */ }
+            int save_ret = ap_mode ? sg_save_ap(p1->chr, ap_ident) : sg_save(p1->chr);
+            if(save_ret != SD_SUCCESS) {
+                log_error("Failed to save pilot %s", p1->chr->pilot.name);
+            }
         }
         if(is_demoplay(gs)) {
             game_state_set_next(gs, SCENE_VS);
