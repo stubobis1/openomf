@@ -26,7 +26,7 @@ static int save_pilot_to_dir(sd_chr_file *chr, path dir, const char *filename_st
         log_error("Saving pilot to %s failed: %s", path_c(&dir), strerror(errno));
         return ret;
     }
-    log_info("Saved pilot %s to %s", chr->pilot.name, path_c(&dir));
+    log_info("Saved pilot %s to %s", str_c(&chr->pilot.name), path_c(&dir));
     str stem;
     path_stem(&dir, &stem);
     omf_free(settings_get()->tournament.last_name);

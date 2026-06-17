@@ -473,14 +473,14 @@ static void setup_first_run(sd_pilot *pilot, int har_id, const char *slot_name) 
     pilot->har_id     = har_id;
     pilot->money      = APSave.har_money[har_id];
     pilot->difficulty = APSeedSettings.difficulty;
-    snprintf(pilot->name, 18, "%s", slot_name);
+    str_from_c(&pilot->name, slot_name);
 }
 
 static void restore_from_save(game_player *p1, const char *slot_name) {
     int har_id = p1->pilot->har_id;
     p1->pilot->money      = APSave.har_money[har_id];
     p1->pilot->difficulty = APSeedSettings.difficulty;
-    snprintf(p1->pilot->name, 18, "%s", slot_name);
+    str_from_c(&p1->pilot->name, slot_name);
     if(p1->pilot->trn_name[0] != '\0')
         restore_tournament(p1->pilot->trn_name);
 }
@@ -528,7 +528,7 @@ void ap_mechlab_save(game_player *p1) {
     Archipelago_APSaveState(ap_ident);
     int save_ret = sg_save_ap(p1->chr, ap_ident);
     if(save_ret != SD_SUCCESS)
-        log_error("Failed to save pilot %s", p1->chr->pilot.name);
+        log_error("Failed to save pilot %s", str_c(&p1->chr->pilot.name));
 }
 
 void ap_mechlab_set_tournament(sd_tournament_file *trn) {
