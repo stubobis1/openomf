@@ -271,6 +271,7 @@ if(USE_ARCHIPELAGO)
         AP_NO_SCHEMA
         ASIO_STANDALONE
         _WEBSOCKETPP_CPP11_STRICT_
+        _WEBSOCKETPP_CPP11_THREAD_
     )
     # Use system asio (libasio-dev) — the submodule asio 1.38 removed io_service
     # which websocketpp still requires.
@@ -293,6 +294,9 @@ if(USE_ARCHIPELAGO)
     # OpenSSL: needed by asio/ssl for wss:// support; PUBLIC so it propagates.
     find_package(OpenSSL REQUIRED)
     target_link_libraries(omf_apclient PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+    if(WIN32)
+        target_link_libraries(omf_apclient PUBLIC crypt32)
+    endif()
 endif()
 
 list(APPEND CORELIBS openomf_core)
