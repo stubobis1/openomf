@@ -1,4 +1,5 @@
 #include "game/scenes/mainmenu/menu_net.h"
+#include "game/scenes/mainmenu/menu_ap.h"
 #include "game/scenes/mainmenu/menu_connect.h"
 #include "game/scenes/mainmenu/menu_listen.h"
 #include "game/scenes/mainmenu/menu_netconfig.h"
@@ -34,6 +35,11 @@ void menu_net_config(component *c, void *userdata) {
     menu_set_submenu(c->parent, menu_netconfig_create(s));
 }
 
+void menu_net_archipelago(component *c, void *userdata) {
+    scene *s = userdata;
+    menu_set_submenu(c->parent, menu_ap_create(s));
+}
+
 component *menu_net_create(scene *s) {
     component *menu = menu_create();
     menu_attach(menu, label_create_title("NETWORK PLAY"));
@@ -57,6 +63,7 @@ component *menu_net_create(scene *s) {
     component *config = button_create("CONFIGURATION", "Configure network options.", false, false, menu_net_config, s);
     menu_attach(menu, config);
 
+    menu_attach(menu, button_create("ARCHIPELAGO", "Connect to an Archipelago multiworld server.", false, false, menu_net_archipelago, s));
     menu_attach(menu, button_create("DONE", "Return to main menu.", false, false, menu_net_done, NULL));
     return menu;
 }

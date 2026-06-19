@@ -285,8 +285,9 @@ if(USE_ARCHIPELAGO)
         ${ASIO_INCLUDE_DIR}
     )
     target_compile_definitions(openomf_core PUBLIC USE_ARCHIPELAGO)
-    # ap_mechlab.c is pure C — compiled into openomf_core (not omf_apclient).
+    # ap_mechlab.c and ap_arena.c are pure C — compiled into openomf_core (not omf_apclient).
     target_sources(openomf_core PRIVATE src/archipelago/ap_mechlab.c)
+    target_sources(openomf_core PRIVATE src/archipelago/ap_arena.c)
     # Suppress warnings from heavy AP headers when compiling apconnect.cpp
     if(NOT MSVC)
         target_compile_options(omf_apclient PRIVATE -w)

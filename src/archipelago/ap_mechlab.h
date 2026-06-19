@@ -1,15 +1,47 @@
 #ifndef AP_MECHLAB_H
 #define AP_MECHLAB_H
 
+#include <stdbool.h>
 #include <stdint.h>
+#include "formats/error.h"
+#include "formats/pilot.h"
+#include "formats/tournament.h"
+#include "game/gui/component.h"
 #include "game/protos/scene.h"
 #include "utils/vector.h"
 
-typedef struct component component; // forward-declare; avoids pulling in gui headers
+typedef struct game_player_t game_player;
+typedef struct game_state_t game_state;
+
+// Expose ap_mode so files only need to include ap_mechlab.h for AP gating.
+extern bool ap_mode;
 
 // Mechlab lifecycle: call attach on mechlab_create, detach on mechlab_free.
 void ap_mechlab_attach(scene *s);
 void ap_mechlab_detach(void);
+
+// Find AP pilot from save ident; set pilot + mech. Then attach mechlab callbacks.
+bool ap_mechlab_find_player(scene *s);
+bool ap_mechlab_find_and_attach(scene *s);
+
+// Persist AP state and CHR for a game_player.
+void ap_mechlab_save(game_player *p1);
+
+// Map tournament filename to AP tournament index and match offset.
+void ap_mechlab_set_tournament(sd_tournament_file *trn);
+
+// --- Arena helpers ---
+
+// Send AP checks for a tournament match win.
+void ap_arena_match_win(game_state *gs, game_player *p1, game_player *p2);
+
+// --- Trade menu helpers ---
+
+// Preview a HAR in the trade menu (set har_id, sync stats, update display).
+void ap_preview_har(scene *s, int har_id);
+
+// Full AP confirm-trade handler — replaces the vanilla money/stats swap.
+void ap_confirm_trade(component *c, scene *s, game_player *p1);
 
 // --- Training (lab_menu_training.c) ---
 
@@ -29,6 +61,11 @@ void ap_do_train(scene *s, int stat);
 // Scout the current-level training location for the hint text.
 void ap_focus_train(scene *s, int stat);
 
+// Full AP training buy, price-check, and focus handlers.
+void ap_training_buy(scene *s, int stat);
+void ap_training_check_price(component *c, scene *s, int stat);
+void ap_training_focus(scene *s, int stat);
+
 // --- HAR upgrades (lab_menu_customize.c) ---
 
 // ap_buy_price is also used inline by focus handlers for price display.
@@ -45,10 +82,22 @@ void ap_update_buy_har_labels(sd_pilot *pilot, int stat, int next_buy_level);
 void ap_do_buy_har(scene *s, int har_id, int stat);
 void ap_focus_buy_har(scene *s, int har_id, int stat);
 
+// Full AP HAR buy, price-check, and focus handlers.
+void ap_customize_buy(scene *s, sd_pilot *pilot, int stat);
+void ap_customize_check_price(component *c, sd_pilot *pilot, int stat);
+void ap_customize_focus(scene *s, sd_pilot *pilot, int stat);
+
+bool ap_has_har_color_primary(void);
+bool ap_has_har_color_secondary(void);
+bool ap_has_har_color_tertiary(void);
+
 // --- Other ---
 
 // Apply AP progressive HAR/pilot stats to a pilot (e.g. after a HAR trade).
 void ap_apply_har_stats(sd_pilot *pilot);
+
+// Full AP trade confirm handler: builds message, creates confirm menu, finishes parent.
+void ap_do_trade(component *c, scene *s);
 
 // --- Trade menu (lab_menu_trade.c) ---
 
@@ -64,5 +113,8 @@ void ap_on_tournament_win(void);
 // Filter trnlist to only include tournaments accessible by the player's
 // Progressive Tournament Access count. Call after trnlist_init in AP mode.
 void ap_filter_trnlist(vector *trnlist);
+
+// mechlab_set_hint with word-wrap at 39 characters.
+void ap_set_hint(scene *s, const char *hint);
 
 #endif // AP_MECHLAB_H

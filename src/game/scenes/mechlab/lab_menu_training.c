@@ -17,101 +17,71 @@
 static component *label1;
 static component *label2;
 
+static int32_t prices[] = {50,   80,   120,   180,   240,   300,   450,   600,   800,   1100,   1500,   2500,
+                           4000, 7000, 10000, 14000, 20000, 28000, 40000, 55000, 75000, 100000, 140000, 200000};
+
 static void lab_menu_focus_power(component *c, bool focused, void *userdata);
 static void lab_menu_focus_agility(component *c, bool focused, void *userdata);
 static void lab_menu_focus_endurance(component *c, bool focused, void *userdata);
 
 void lab_menu_training_power(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_buy(s, AP_PILOT_POWER); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
-    int32_t price = ap_train_price(level);
-    pilot->money -= price;
-    /* AP */ if(ap_mode) {
-        ap_do_train(s, AP_PILOT_POWER);
-        ap_update_train_labels(512, level + 1);
-    } else {
-        pilot->power++;
-        lab_menu_focus_power(c, true, userdata);
-    }
+    pilot->money -= prices[pilot->power];
+    pilot->power++;
     mechlab_update(s);
+    lab_menu_focus_power(c, true, userdata);
 }
 
 void lab_menu_training_check_power_price(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_POWER); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
-    if(level >= max_level) {
-        component_disable(c, 1);
-        return;
-    }
-    int32_t price = ap_train_price(level);
-    component_disable(c, price > pilot->money);
+    if(pilot->power > 23) { component_disable(c, 1); return; }
+    component_disable(c, prices[pilot->power] > pilot->money);
 }
 
 void lab_menu_training_agility(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_buy(s, AP_PILOT_AGILITY); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
-    int32_t price = ap_train_price(level);
-    pilot->money -= price;
-    /* AP */ if(ap_mode) {
-        ap_do_train(s, AP_PILOT_AGILITY);
-        ap_update_train_labels(513, level + 1);
-    } else {
-        pilot->agility++;
-        lab_menu_focus_agility(c, true, userdata);
-    }
+    pilot->money -= prices[pilot->agility];
+    pilot->agility++;
     mechlab_update(s);
+    lab_menu_focus_agility(c, true, userdata);
 }
 
 void lab_menu_training_check_agility_price(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_AGILITY); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
-    if(level >= max_level) {
-        component_disable(c, 1);
-        return;
-    }
-    int32_t price = ap_train_price(level);
-    component_disable(c, price > pilot->money);
+    if(pilot->agility > 23) { component_disable(c, 1); return; }
+    component_disable(c, prices[pilot->agility] > pilot->money);
 }
 
 void lab_menu_training_endurance(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_buy(s, AP_PILOT_ENDURANCE); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
-    int32_t price = ap_train_price(level);
-    pilot->money -= price;
-    /* AP */ if(ap_mode) {
-        ap_do_train(s, AP_PILOT_ENDURANCE);
-        ap_update_train_labels(514, level + 1);
-    } else {
-        pilot->endurance++;
-        lab_menu_focus_endurance(c, true, userdata);
-    }
+    pilot->money -= prices[pilot->endurance];
+    pilot->endurance++;
     mechlab_update(s);
+    lab_menu_focus_endurance(c, true, userdata);
 }
 
 void lab_menu_training_check_endurance_price(component *c, void *userdata) {
     scene *s = userdata;
+    if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_ENDURANCE); return; }
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
-    int max_level = ap_mode ? APSeedSettings.pilot_stat_max : 23;
-    int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
-    if(level >= max_level) {
-        component_disable(c, 1);
-        return;
-    }
-    int32_t price = ap_train_price(level);
-    component_disable(c, price > pilot->money);
+    if(pilot->endurance > 23) { component_disable(c, 1); return; }
+    component_disable(c, prices[pilot->endurance] > pilot->money);
 }
 
 void lab_menu_training_done(component *c, void *userdata) {
@@ -130,72 +100,57 @@ static const button_details details_list[] = {
 static void lab_menu_focus_power(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+        if(ap_mode) { ap_training_focus(s, AP_PILOT_POWER); return; }
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        int level = ap_mode ? APChecks.pilot_train[AP_PILOT_POWER] : pilot->power;
-        /* AP */ if(ap_mode) {
-            ap_update_train_labels(512, level);
-            ap_focus_train(s, AP_PILOT_POWER);
+        label_set_text(label1, lang_get(512));
+        if(pilot->power > 23) {
+            label_set_text(label2, "UNAVAILABLE");
         } else {
-            label_set_text(label1, lang_get(512));
-            if(level >= 23) {
-                label_set_text(label2, "UNAVAILABLE");
-            } else {
-                char tmp[32]; char price_str[16];
-                score_format(ap_train_price(level), price_str, sizeof(price_str));
-                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-                label_set_text(label2, tmp);
-            }
-            mechlab_set_hint_wrapped(s, lang_get(533));
+            char tmp[32]; char price_str[16];
+            score_format(prices[pilot->power], price_str, sizeof(price_str));
+            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+            label_set_text(label2, tmp);
         }
+        mechlab_set_hint(s, lang_get(533));
     }
 }
 
 static void lab_menu_focus_agility(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+        if(ap_mode) { ap_training_focus(s, AP_PILOT_AGILITY); return; }
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        int level = ap_mode ? APChecks.pilot_train[AP_PILOT_AGILITY] : pilot->agility;
-        /* AP */ if(ap_mode) {
-            ap_update_train_labels(513, level);
-            ap_focus_train(s, AP_PILOT_AGILITY);
+        label_set_text(label1, lang_get(513));
+        if(pilot->agility > 23) {
+            label_set_text(label2, "UNAVAILABLE");
         } else {
-            label_set_text(label1, lang_get(513));
-            if(level >= 23) {
-                label_set_text(label2, "UNAVAILABLE");
-            } else {
-                char tmp[32]; char price_str[16];
-                score_format(ap_train_price(level), price_str, sizeof(price_str));
-                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-                label_set_text(label2, tmp);
-            }
-            mechlab_set_hint_wrapped(s, lang_get(534));
+            char tmp[32]; char price_str[16];
+            score_format(prices[pilot->agility], price_str, sizeof(price_str));
+            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+            label_set_text(label2, tmp);
         }
+        mechlab_set_hint(s, lang_get(534));
     }
 }
 
 static void lab_menu_focus_endurance(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+        if(ap_mode) { ap_training_focus(s, AP_PILOT_ENDURANCE); return; }
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
-        int level = ap_mode ? APChecks.pilot_train[AP_PILOT_ENDURANCE] : pilot->endurance;
-        /* AP */ if(ap_mode) {
-            ap_update_train_labels(514, level);
-            ap_focus_train(s, AP_PILOT_ENDURANCE);
+        label_set_text(label1, lang_get(514));
+        if(pilot->endurance > 23) {
+            label_set_text(label2, "UNAVAILABLE");
         } else {
-            label_set_text(label1, lang_get(514));
-            if(level >= 23) {
-                label_set_text(label2, "UNAVAILABLE");
-            } else {
-                char tmp[32]; char price_str[16];
-                score_format(ap_train_price(level), price_str, sizeof(price_str));
-                snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
-                label_set_text(label2, tmp);
-            }
-            mechlab_set_hint_wrapped(s, lang_get(535));
+            char tmp[32]; char price_str[16];
+            score_format(prices[pilot->endurance], price_str, sizeof(price_str));
+            snprintf(tmp, sizeof(tmp), "$ %sK", price_str);
+            label_set_text(label2, tmp);
         }
+        mechlab_set_hint(s, lang_get(535));
     }
 }
 
@@ -204,7 +159,7 @@ void lab_menu_focus_training_done(component *c, bool focused, void *userdata) {
         scene *s = userdata;
         label_set_text(label1, "");
         label_set_text(label2, "");
-        mechlab_set_hint_wrapped(s, lang_get(536));
+        mechlab_set_hint(s, lang_get(536));
     }
 }
 

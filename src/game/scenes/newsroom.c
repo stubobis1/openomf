@@ -324,7 +324,7 @@ void newsroom_input_tick(scene *scene) {
                                 }
                             }
                             if(p1->chr && local->champion) {
-                                /* AP */ if(ap_mode) ap_on_tournament_win();
+                                if(ap_mode) ap_on_tournament_win();
                                 game_state_set_next(scene->gs, SCENE_TRN_CUTSCENE);
                             } else {
                                 game_state_set_next(scene->gs, SCENE_VS);

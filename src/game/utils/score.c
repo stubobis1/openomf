@@ -7,8 +7,6 @@
 #include <math.h>
 #include <stdio.h>
 
-#define TEXT_HUD_COLOR 0xE7
-#define TEXT_HUD_SHADOW 0xF8
 
 #define SLIDER_DISTANCE 50
 #define SLIDER_HANG_TIME 25
@@ -206,19 +204,19 @@ void chr_score_render(chr_score *score, bool render_total_points) {
     }
 }
 
-void chr_score_add(chr_score *score, char *text, int points, vec2i pos, float position) {
-    // Create texture
-    // Add texture to list, set position to 1.0f, set points
+void chr_score_add_obj(chr_score *score, text *obj, int points, vec2i pos, float position) {
     score_text s;
-    s.text = create_text_obj(text);
+    s.text = obj;
     s.points = points;
     s.start = pos;
-    // center correctly initially, but end up justified
     s.start.x -= text_get_layout_width(s.text) / 2;
     s.position = position;
     s.age = 0;
-
     list_append(&score->texts, &s, sizeof(score_text));
+}
+
+void chr_score_add(chr_score *score, const char *text, int points, vec2i pos, float position) {
+    chr_score_add_obj(score, create_text_obj(text), points, pos, position);
 }
 
 void chr_score_hit(chr_score *score, int points) {

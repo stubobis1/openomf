@@ -29,6 +29,10 @@ void Archipelago_GoalComplete(void);
 // item_name and player_name are transient — copy if needed beyond the call.
 void Archipelago_SetItemReceivedCallback(void (*cb)(const char *item_name, const char *player_name));
 
+// Register a callback invoked only for items received from another player's world
+// (incremental batches only — not the initial history replay on connect).
+void Archipelago_SetForeignItemCallback(void (*cb)(const char *item_name, const char *player_name));
+
 // Scout (and hint) a buy location. Response arrives via the buy hint callback.
 void Archipelago_ScoutBuyLocation(int64_t location_id);
 
@@ -39,6 +43,10 @@ void Archipelago_SetBuyHintCallback(void (*cb)(int64_t location_id, const char *
 // Register a callback invoked once after each on_items_received batch completes.
 // Fires after all per-item callbacks, so APItems and APChecks are fully rebuilt.
 void Archipelago_SetItemsDoneCallback(void (*cb)(void));
+
+// Register a callback invoked at the START of a full history replay (index 0 batch).
+// Use to reset any "past-replay" guards before the replay items arrive.
+void Archipelago_SetReplayStartCallback(void (*cb)(void));
 
 // Write a deterministic save-file identifier derived from the current seed + slot
 // into out (up to len bytes, including NUL). Format: "AP" + 8 uppercase hex digits.
