@@ -38,7 +38,9 @@ void mechlab_set_selling(scene *scene, bool selling);
 bool mechlab_get_selling(scene *scene);
 
 void mechlab_set_hint(scene *scene, const char *hint);
+#if ARCHIPELAGO_ENABLED
 chr_score *mechlab_get_ap_score(scene *scene);
+#endif
 void mechlab_spin_har(scene *scene, bool to_spin_or_not_to_spin);
 
 sd_chr_enemy *mechlab_next_opponent(scene *scene);

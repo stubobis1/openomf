@@ -1,7 +1,9 @@
 #include <stdio.h>
 
-/* AP */ #include "archipelago/ap_mechlab.h"
-/* AP */ #include "archipelago/apstate.h"
+#if ARCHIPELAGO_ENABLED
+#include "archipelago/ap_mechlab.h"
+#include "archipelago/apstate.h"
+#endif
 #include "game/gui/label.h"
 #include "game/gui/sizer.h"
 #include "game/gui/spritebutton.h"
@@ -26,7 +28,9 @@ static void lab_menu_focus_endurance(component *c, bool focused, void *userdata)
 
 void lab_menu_training_power(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_buy(s, AP_PILOT_POWER); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     pilot->money -= prices[pilot->power];
@@ -37,7 +41,9 @@ void lab_menu_training_power(component *c, void *userdata) {
 
 void lab_menu_training_check_power_price(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_POWER); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     if(pilot->power > 23) { component_disable(c, 1); return; }
@@ -46,7 +52,9 @@ void lab_menu_training_check_power_price(component *c, void *userdata) {
 
 void lab_menu_training_agility(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_buy(s, AP_PILOT_AGILITY); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     pilot->money -= prices[pilot->agility];
@@ -57,7 +65,9 @@ void lab_menu_training_agility(component *c, void *userdata) {
 
 void lab_menu_training_check_agility_price(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_AGILITY); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     if(pilot->agility > 23) { component_disable(c, 1); return; }
@@ -66,7 +76,9 @@ void lab_menu_training_check_agility_price(component *c, void *userdata) {
 
 void lab_menu_training_endurance(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_buy(s, AP_PILOT_ENDURANCE); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     pilot->money -= prices[pilot->endurance];
@@ -77,7 +89,9 @@ void lab_menu_training_endurance(component *c, void *userdata) {
 
 void lab_menu_training_check_endurance_price(component *c, void *userdata) {
     scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) { ap_training_check_price(c, s, AP_PILOT_ENDURANCE); return; }
+#endif
     game_player *p1 = game_state_get_player(s->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     if(pilot->endurance > 23) { component_disable(c, 1); return; }
@@ -100,7 +114,9 @@ static const button_details details_list[] = {
 static void lab_menu_focus_power(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
         if(ap_mode) { ap_training_focus(s, AP_PILOT_POWER); return; }
+#endif
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
         label_set_text(label1, lang_get(512));
@@ -119,7 +135,9 @@ static void lab_menu_focus_power(component *c, bool focused, void *userdata) {
 static void lab_menu_focus_agility(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
         if(ap_mode) { ap_training_focus(s, AP_PILOT_AGILITY); return; }
+#endif
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
         label_set_text(label1, lang_get(513));
@@ -138,7 +156,9 @@ static void lab_menu_focus_agility(component *c, bool focused, void *userdata) {
 static void lab_menu_focus_endurance(component *c, bool focused, void *userdata) {
     if(focused) {
         scene *s = userdata;
+#if ARCHIPELAGO_ENABLED
         if(ap_mode) { ap_training_focus(s, AP_PILOT_ENDURANCE); return; }
+#endif
         game_player *p1 = game_state_get_player(s->gs, 0);
         sd_pilot *pilot = game_player_get_pilot(p1);
         label_set_text(label1, lang_get(514));
@@ -210,7 +230,9 @@ component *lab_menu_training_create(scene *s) {
     component_set_pos_hints(label2, 200, 186);
     trnmenu_attach(menu, label2);
 
-    /* AP */ ap_register_train_labels(label1, label2);
+#if ARCHIPELAGO_ENABLED
+    ap_register_train_labels(label1, label2);
+#endif
 
     // Bind hand animation
     trnmenu_bind_hand(menu, hand_of_doom, s->gs);

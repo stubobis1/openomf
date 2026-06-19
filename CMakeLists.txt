@@ -194,8 +194,13 @@ set_source_files_properties("src/game/audio/audio_sources.c"
 
 # Remove all render plugin source code from OPENOMF_SRC
 list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/video/renderers/.*/")
-# Exclude AP submodule sources — built separately as omf_apclient.
-list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/submodule/")
+# Exclude AP sources when Archipelago is disabled; exclude submodule always (built separately).
+if(USE_ARCHIPELAGO)
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/submodule/")
+else()
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/")
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "menu_ap\.")
+endif()
 # Enable "NULL" renderer in debug builds, for automated testing
 list(APPEND OPENOMF_SRC
   "$<$<CONFIG:Debug>:src/video/renderers/null/null_renderer.c>"
@@ -284,7 +289,7 @@ if(USE_ARCHIPELAGO)
         ${AP_SUB}/websocketpp
         ${ASIO_INCLUDE_DIR}
     )
-    target_compile_definitions(openomf_core PUBLIC USE_ARCHIPELAGO)
+    target_compile_definitions(openomf_core PUBLIC ARCHIPELAGO_ENABLED)
     # ap_mechlab.c and ap_arena.c are pure C — compiled into openomf_core (not omf_apclient).
     target_sources(openomf_core PRIVATE src/archipelago/ap_mechlab.c)
     target_sources(openomf_core PRIVATE src/archipelago/ap_arena.c)

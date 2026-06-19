@@ -95,6 +95,7 @@ int sg_save(sd_chr_file *chr) {
     return ret;
 }
 
+#if ARCHIPELAGO_ENABLED
 int sg_save_as(sd_chr_file *chr, const char *filename_stem) {
     path save = get_save_directory();
     path_append(&save, filename_stem);
@@ -141,10 +142,11 @@ int sg_load_ap_pilot(sd_chr_file *chr, const char *pilot_name) {
     path_set_ext(&save, ".CHR");
     path_dossify_filename(&save);
     if(!path_is_file(&save)) {
-        return SD_FILE_OPEN_ERROR; // first run — no save yet, not an error
+        return SD_FILE_OPEN_ERROR;
     }
     return sg_load(chr, &save);
 }
+#endif
 
 int sg_delete(const char *pilot_name) {
     path save = get_save_directory();

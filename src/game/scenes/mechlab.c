@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* AP */ #include "archipelago/ap_mechlab.h"
-/* AP */ #include "archipelago/apstate.h"
-/* AP */ #include "game/utils/score.h"
+#if ARCHIPELAGO_ENABLED
+#include "archipelago/ap_mechlab.h"
+#include "archipelago/apstate.h"
+#endif
 #include "formats/error.h"
 #include "formats/tournament.h"
 #include "game/game_state.h"
@@ -62,7 +63,9 @@ typedef struct {
     text *popup;
     surface popup_bg1;
     surface popup_bg2;
+#if ARCHIPELAGO_ENABLED
     chr_score ap_score;
+#endif
 } mechlab_local;
 
 bool mechlab_find_last_player(scene *scene) {
@@ -178,13 +181,18 @@ sd_chr_enemy *mechlab_next_opponent(scene *scene) {
 
 void mechlab_free(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) ap_mechlab_detach();
+#endif
 
     game_player *player1 = game_state_get_player(scene->gs, 0);
     // save the character file
     if(player1->chr != NULL) {
+#if ARCHIPELAGO_ENABLED
         if(ap_mode) { ap_mechlab_save(player1); }
-        else if(sg_save(player1->chr) != SD_SUCCESS) {
+        else
+#endif
+        if(sg_save(player1->chr) != SD_SUCCESS) {
             log_error("Failed to save pilot %s", player1->chr->pilot.name);
         }
     }
@@ -193,7 +201,9 @@ void mechlab_free(scene *scene) {
         object_free(&local->bg_obj[i]);
     }
 
+#if ARCHIPELAGO_ENABLED
     chr_score_free(&local->ap_score);
+#endif
     text_free(&local->popup);
     surface_free(&local->popup_bg1);
     surface_free(&local->popup_bg2);
@@ -300,7 +310,9 @@ static void mechlab_theme(gui_theme *theme) {
 void mechlab_tick(scene *scene, int paused) {
     mechlab_local *local = scene_get_userdata(scene);
 
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) chr_score_tick(&local->ap_score);
+#endif
 
     if(local->popup) {
         return;
@@ -352,7 +364,9 @@ void mechlab_tick(scene *scene, int paused) {
             } else {
                 player1->pilot->money = player1->pilot->money - trn->registration_fee;
             }
+#if ARCHIPELAGO_ENABLED
             if(ap_mode) ap_mechlab_set_tournament(trn);
+#endif
             sd_chr_file *oldchr = player1->chr;
             player1->chr = omf_calloc(1, sizeof(sd_chr_file));
             sd_chr_create(player1->chr);
@@ -370,8 +384,11 @@ void mechlab_tick(scene *scene, int paused) {
                 omf_free(oldchr);
             }
 
+#if ARCHIPELAGO_ENABLED
             if(ap_mode) { ap_mechlab_save(player1); }
-            else if(sg_save(player1->chr) != SD_SUCCESS) {
+            else
+#endif
+            if(sg_save(player1->chr) != SD_SUCCESS) {
                 log_error("Failed to save pilot %s", player1->chr->pilot.name);
             }
             // force the character to reload because its just easier
@@ -379,7 +396,11 @@ void mechlab_tick(scene *scene, int paused) {
             sd_chr_free(player1->chr);
             omf_free(player1->chr);
 
-            bool found = ap_mode ? ap_mechlab_find_and_attach(scene) : mechlab_find_last_player(scene);
+            bool found =
+#if ARCHIPELAGO_ENABLED
+                ap_mode ? ap_mechlab_find_and_attach(scene) :
+#endif
+                mechlab_find_last_player(scene);
             mechlab_select_dashboard(scene, DASHBOARD_STATS);
             gui_frame_free(local->frame);
             gui_theme theme;
@@ -533,7 +554,9 @@ void mechlab_render(scene *scene) {
         text_draw(local->popup, (NATIVE_W - POPUP_TEXT_W) / 2, POPUP_CENTERY - POPUP_TEXT_H / 2);
     }
 
+#if ARCHIPELAGO_ENABLED
     if(ap_mode) chr_score_render(&local->ap_score, false);
+#endif
 }
 
 void mechlab_input_tick(scene *scene) {
@@ -604,10 +627,12 @@ void mechlab_input_tick(scene *scene) {
     controller_free_chain(p1);
 }
 
+#if ARCHIPELAGO_ENABLED
 chr_score *mechlab_get_ap_score(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
     return &local->ap_score;
 }
+#endif
 
 // Init mechlab
 int mechlab_create(scene *scene) {
@@ -651,11 +676,17 @@ int mechlab_create(scene *scene) {
     component_init(local->hint, &local->theme);
     component_layout(local->hint, 32, 131, 248, 13);
 
+#if ARCHIPELAGO_ENABLED
     chr_score_create(&local->ap_score);
     chr_score_set_pos(&local->ap_score, 160, 30, OBJECT_FACE_RIGHT);
+#endif
 
     scene_set_userdata(scene, local);
-    bool found = ap_mode ? ap_mechlab_find_and_attach(scene) : mechlab_find_last_player(scene);
+    bool found =
+#if ARCHIPELAGO_ENABLED
+        ap_mode ? ap_mechlab_find_and_attach(scene) :
+#endif
+        mechlab_find_last_player(scene);
 
     mechlab_select_dashboard(scene, DASHBOARD_STATS);
 

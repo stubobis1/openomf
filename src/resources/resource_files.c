@@ -58,6 +58,7 @@ path get_save_directory(void) {
     return name;
 }
 
+#if ARCHIPELAGO_ENABLED
 path get_ap_save_directory(void) {
     path name = get_save_directory();
     path_append(&name, "ap");
@@ -66,6 +67,7 @@ path get_ap_save_directory(void) {
     }
     return name;
 }
+#endif
 
 bool scan_save_directory(list *results, const char *pattern) {
     const path scan = get_save_directory();
