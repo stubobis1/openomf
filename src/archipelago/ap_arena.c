@@ -12,6 +12,9 @@
 
 static scene *g_arena_scene = NULL;
 
+#define TEXT_HUD_COLOR  0xE7
+#define TEXT_HUD_SHADOW 0xF8
+
 #define PENDING_MAX 20
 typedef struct { char item[80]; char player[48]; } pending_item_t;
 static pending_item_t g_pending[PENDING_MAX];

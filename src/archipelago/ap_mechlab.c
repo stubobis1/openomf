@@ -22,7 +22,7 @@
 #include "game/scenes/mechlab/lab_menu_trade.h"
 #include "game/utils/formatting.h"
 #include "resources/languages.h"
-#include "resources/sgmanager.h"
+#include "archipelago/ap_sgmanager.h"
 #include "resources/trnmanager.h"
 #include "utils/allocator.h"
 #include "utils/log.h"

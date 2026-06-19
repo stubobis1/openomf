@@ -9,9 +9,6 @@ path get_scores_filename(void);
 path get_screenshot_filename(const char *timestamp);
 path get_snapshot_rec_filename(const char *timestamp);
 path get_save_directory(void);
-#if ARCHIPELAGO_ENABLED
-path get_ap_save_directory(void);
-#endif
 bool scan_save_directory(list *results, const char *pattern);
 path get_shader_filename(const char *shader_name);
 path get_game_controller_db_filename(void);

@@ -346,6 +346,7 @@ static void arena_end(scene *sc) {
         if(!gs->match_settings.sim) {
             p1->pilot->money += fight_stats->profit;
 #if ARCHIPELAGO_ENABLED
+            // this is to prevent selling parts, which can't happen in AP
             if(ap_mode && p1->pilot->money < 0) {
                 p1->pilot->money = 0;
             }
@@ -382,25 +383,13 @@ static void arena_end(scene *sc) {
             } else {
                 fight_stats->plug_text = PLUG_WIN + rand_int(3);
             }
-        } else if(
-#if ARCHIPELAGO_ENABLED
-            !ap_mode &&
-#endif
-            p1->pilot->money < 0 && sell_highest_value_upgrade(p1->pilot, fight_stats->sold)) {
+        } else if(p1->pilot->money < 0 && sell_highest_value_upgrade(p1->pilot, fight_stats->sold)) {
             fight_stats->plug_text = PLUG_SOLD_UPGRADE;
-        } else if(
-#if ARCHIPELAGO_ENABLED
-            !ap_mode &&
-#endif
-            warning_given && p1->pilot->money < 0) {
+        } else if(warning_given && p1->pilot->money < 0) {
             fight_stats->plug_text = PLUG_KICK_OUT;
             p1->pilot->money = 0;
             sd_pilot_exit_tournament(p1->pilot);
-        } else if(
-#if ARCHIPELAGO_ENABLED
-            !ap_mode &&
-#endif
-            p1->pilot->money < 0) {
+        } else if(p1->pilot->money < 0) {
             fight_stats->plug_text = PLUG_WARNING;
         } else {
             fight_stats->plug_text = PLUG_LOSE + rand_int(5);
@@ -408,8 +397,9 @@ static void arena_end(scene *sc) {
 
         if(p1->chr) {
 #if ARCHIPELAGO_ENABLED
-            if(ap_mode) { ap_mechlab_save(p1); }
-            else
+            if(ap_mode) {
+                ap_mechlab_save(p1);
+            } else
 #endif
             if(sg_save(p1->chr) != SD_SUCCESS) {
                 log_error("Failed to save pilot %s", p1->chr->pilot.name);
