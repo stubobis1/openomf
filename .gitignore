@@ -10,6 +10,9 @@ build/CMakeFiles/
 build/music/
 build/
 mingw_build/
+build-noap/
+build-langtools/
+build-windows/
 *.sw[klmnop]
 .idea
 .vscode
