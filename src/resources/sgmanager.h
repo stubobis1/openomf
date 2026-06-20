@@ -9,9 +9,6 @@ list *sg_load_all(void);
 int sg_load(sd_chr_file *chr, const path *file_name);
 int sg_load_pilot(sd_chr_file *chr, const char *pilot_name);
 int sg_save(sd_chr_file *chr);
-int sg_save_as(sd_chr_file *chr, const char *filename_stem);
-int sg_save_ap(sd_chr_file *chr, const char *filename_stem);
-int sg_load_ap_pilot(sd_chr_file *chr, const char *pilot_name);
 int sg_delete(const char *pilot_name);
 
 #endif // SGMANAGER_H
