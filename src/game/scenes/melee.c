@@ -1,11 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-#if ARCHIPELAGO_ENABLED
-#include "archipelago/ap_mechlab.h"
-#include "archipelago/ap_melee.h"
-#include "archipelago/apstate.h"
-#endif
 #include "audio/audio.h"
 #include "formats/pilot.h"
 #include "game/audio/music_tracker.h"
@@ -293,7 +288,6 @@ static void refresh_pilot_stats(scene *scene, int player_id) {
     }
 }
 
-
 void update_har(scene *scene, int player) {
     melee_local *local = scene_get_userdata(scene);
     if(local->page == HAR_SELECT) {
@@ -314,13 +308,6 @@ void update_har(scene *scene, int player) {
         } else {
             text_set_from_c(local->har_title, har_get_name(CURSOR_INDEX(local, 0)));
         }
-#if ARCHIPELAGO_ENABLED
-        if(ap_mode && APSeedSettings.include_buy && local->wins[player] != NULL) {
-            char info[64];
-            ap_har_info_text(CURSOR_INDEX(local, player), info, sizeof(info));
-            text_set_from_c(local->wins[player], info);
-        }
-#endif
     }
 }
 
@@ -810,10 +797,6 @@ void melee_render(scene *scene) {
     if(player2->selectable) {
         text_draw(local->wins[0], 8, 107);
         text_draw(local->wins[1], 160, 107);
-#if ARCHIPELAGO_ENABLED
-    } else if(local->page == HAR_SELECT && local->wins[0] != NULL) {
-        text_draw(local->wins[0], 8, 107);
-#endif
     }
 }
 
@@ -999,40 +982,21 @@ int melee_create(scene *scene) {
     object_select_sprite(&local->big_portrait_1, 0);
 
     if(player2->selectable) {
+        chr_score *s1 = game_player_get_score(game_state_get_player(scene->gs, 0));
+        chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));
+
         char tmp[64];
-#if ARCHIPELAGO_ENABLED
-        if(ap_mode && APSeedSettings.include_buy) {
-            ap_har_info_text(CURSOR_INDEX(local, 0), tmp, sizeof(tmp));
-            local->wins[0] = create_black_text(160 - 8, 6, tmp);
-            text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-            ap_har_info_text(CURSOR_INDEX(local, 1), tmp, sizeof(tmp));
-            local->wins[1] = create_black_text(160 - 8, 6, tmp);
-            text_set_horizontal_align(local->wins[1], TEXT_ALIGN_RIGHT);
-        } else {
-#endif
-            chr_score *s1 = game_player_get_score(game_state_get_player(scene->gs, 0));
-            chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));
-            snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
-            local->wins[0] = create_black_text(160 - 8, 6, tmp);
-            text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-            snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
-            local->wins[1] = create_black_text(160 - 8, 6, tmp);
-            text_set_horizontal_align(local->wins[1], TEXT_ALIGN_RIGHT);
-#if ARCHIPELAGO_ENABLED
-        }
-#endif
+        snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
+        local->wins[0] = create_black_text(160 - 8, 6, tmp);
+        text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
+        snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
+        local->wins[1] = create_black_text(160 - 8, 6, tmp);
+        text_set_horizontal_align(local->wins[1], TEXT_ALIGN_RIGHT);
 
         object_create(&local->big_portrait_2, scene->gs, vec2i_create(320, 0), vec2f_create(0, 0));
         object_set_animation(&local->big_portrait_2, pilot_big_portraits);
         object_select_sprite(&local->big_portrait_2, 4);
         object_set_direction(&local->big_portrait_2, OBJECT_FACE_LEFT);
-#if ARCHIPELAGO_ENABLED
-    } else if(ap_mode && APSeedSettings.include_buy) {
-        char tmp[64];
-        ap_har_info_text(CURSOR_INDEX(local, 0), tmp, sizeof(tmp));
-        local->wins[0] = create_black_text(160 - 8, 6, tmp);
-        text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-#endif
     }
 
     // This contains the big logo and the frames

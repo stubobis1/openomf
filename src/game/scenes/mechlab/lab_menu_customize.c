@@ -6,7 +6,6 @@
 #include "archipelago/apstate.h"
 #endif
 #include "formats/pilot.h"
-
 #include "game/gui/label.h"
 #include "game/gui/spritebutton.h"
 #include "game/gui/trn_menu.h"

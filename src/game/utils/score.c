@@ -221,19 +221,6 @@ void chr_score_add(chr_score *score, char *text, int points, vec2i pos, float po
     list_append(&score->texts, &s, sizeof(score_text));
 }
 
-#if ARCHIPELAGO_ENABLED
-void chr_score_add_obj(chr_score *score, text *obj, int points, vec2i pos, float position) {
-    score_text s;
-    s.text = obj;
-    s.points = points;
-    s.start = pos;
-    s.start.x -= text_get_layout_width(s.text) / 2;
-    s.position = position;
-    s.age = 0;
-    list_append(&score->texts, &s, sizeof(score_text));
-}
-#endif
-
 void chr_score_hit(chr_score *score, int points) {
     points = points * chr_score_get_difficulty_multiplier(score);
     score->score += points;

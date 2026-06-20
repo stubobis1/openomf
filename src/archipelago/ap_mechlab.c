@@ -7,6 +7,7 @@
 #include "archipelago/apconnect.h"
 #include "archipelago/apitems.h"
 #include "archipelago/apstate.h"
+#include "archipelago/ap_alert.h"
 #include "archipelago/ap_arena.h"
 #include "formats/chr.h"
 #include "formats/pilot.h"
@@ -41,11 +42,8 @@ static component *g_buy_details_label = NULL;
 // --- Price tables ---
 
 // Training prices (AP fixed table, shared with lab_menu_training.c).
-static const int32_t s_train_prices[] = {
-    50,    80,    120,   180,   240,   300,    450,    600,    800,    1100,
-    1500,  2500,  4000,  7000,  10000, 14000,  20000,  28000,  40000,  55000,
-    75000, 100000, 140000, 200000, 280000, 400000, 550000, 750000, 1000000, 1500000,
-};
+static const int32_t s_train_prices[] = {50,   80,   120,   180,   240,   300,   450,   600,   800,   1100,   1500,   2500,
+                                         4000, 7000, 10000, 14000, 20000, 28000, 40000, 55000, 75000, 100000, 140000, 200000};
 
 static const char *const s_buy_headers[AP_STAT_COUNT] = {
     "ARM POWER:\n\nUPGRADE COST:",
@@ -200,7 +198,7 @@ static void on_item_received(const char *item_name, const char *player_name) {
     if(!g_scene) return;
     log_debug("AP - item received: %s (from %s)", item_name, player_name);
     if(g_past_replay)
-        ap_show_score_item(mechlab_get_ap_score(g_scene), item_name, player_name);
+        ap_alert_show_item(mechlab_get_ap_alert(g_scene), item_name, player_name);
     // Sync stats immediately so progressives take effect before on_items_done fires.
     game_player *p1 = game_state_get_player(g_scene->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);

@@ -1293,6 +1293,9 @@ void arena_dynamic_tick(scene *scene, int paused) {
         // Handle scrolling score texts
         chr_score_tick(game_player_get_score(game_state_get_player(scene->gs, 0)));
         chr_score_tick(game_player_get_score(game_state_get_player(scene->gs, 1)));
+#if ARCHIPELAGO_ENABLED
+        if(ap_mode) ap_arena_tick();
+#endif
 
         // Set and tick all proggressbars
         for(int i = 0; i < 2; i++) {
@@ -1510,6 +1513,9 @@ void arena_render_overlay(scene *scene) {
         // Render score stuff
         chr_score_render(game_player_get_score(player[0]), game_player_get_selectable(player[0]));
         chr_score_render(game_player_get_score(player[1]), game_player_get_selectable(player[1]));
+#if ARCHIPELAGO_ENABLED
+        if(ap_mode) ap_arena_render();
+#endif
 
         // render ping, if player is networked
         if(player[0]->ctrl->type == CTRL_TYPE_NETWORK) {

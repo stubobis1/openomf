@@ -5,6 +5,7 @@
 #include <string.h>
 
 #if ARCHIPELAGO_ENABLED
+#include "archipelago/ap_alert.h"
 #include "archipelago/ap_mechlab.h"
 #include "archipelago/apstate.h"
 #endif
@@ -64,7 +65,7 @@ typedef struct {
     surface popup_bg1;
     surface popup_bg2;
 #if ARCHIPELAGO_ENABLED
-    chr_score ap_score;
+    ap_alert ap_alert;
 #endif
 } mechlab_local;
 
@@ -202,7 +203,7 @@ void mechlab_free(scene *scene) {
     }
 
 #if ARCHIPELAGO_ENABLED
-    chr_score_free(&local->ap_score);
+    ap_alert_free(&local->ap_alert);
 #endif
     text_free(&local->popup);
     surface_free(&local->popup_bg1);
@@ -311,7 +312,7 @@ void mechlab_tick(scene *scene, int paused) {
     mechlab_local *local = scene_get_userdata(scene);
 
 #if ARCHIPELAGO_ENABLED
-    if(ap_mode) chr_score_tick(&local->ap_score);
+    if(ap_mode) ap_alert_tick(&local->ap_alert);
 #endif
 
     if(local->popup) {
@@ -555,7 +556,7 @@ void mechlab_render(scene *scene) {
     }
 
 #if ARCHIPELAGO_ENABLED
-    if(ap_mode) chr_score_render(&local->ap_score, false);
+    if(ap_mode) ap_alert_render(&local->ap_alert);
 #endif
 }
 
@@ -628,9 +629,9 @@ void mechlab_input_tick(scene *scene) {
 }
 
 #if ARCHIPELAGO_ENABLED
-chr_score *mechlab_get_ap_score(scene *scene) {
+ap_alert *mechlab_get_ap_alert(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
-    return &local->ap_score;
+    return &local->ap_alert;
 }
 #endif
 
@@ -677,8 +678,8 @@ int mechlab_create(scene *scene) {
     component_layout(local->hint, 32, 131, 248, 13);
 
 #if ARCHIPELAGO_ENABLED
-    chr_score_create(&local->ap_score);
-    chr_score_set_pos(&local->ap_score, 160, 30, OBJECT_FACE_RIGHT);
+    ap_alert_create(&local->ap_alert);
+    ap_alert_set_pos(&local->ap_alert, 160, 30);
 #endif
 
     scene_set_userdata(scene, local);

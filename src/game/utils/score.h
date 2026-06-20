@@ -51,10 +51,6 @@ void chr_score_render(chr_score *score, bool render_total_points);
 int chr_score_onscreen(chr_score *score);
 float chr_score_get_difficulty_multiplier(chr_score *score);
 
-#if ARCHIPELAGO_ENABLED
-void chr_score_add_obj(chr_score *score, text *obj, int points, vec2i pos, float position);
-#endif
-void chr_score_add(chr_score *score, char *text, int points, vec2i pos, float position);
 void chr_score_hit(chr_score *score, int points);
 void chr_score_victory(chr_score *score, int health);
 void chr_score_scrap(chr_score *score);

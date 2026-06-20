@@ -1,10 +1,10 @@
 #ifndef MECHLAB_H
 #define MECHLAB_H
 
+#include "archipelago/ap_alert.h"
 #include "formats/chr.h"
 #include "game/gui/component.h"
 #include "game/protos/scene.h"
-#include "game/utils/score.h"
 
 #define MECHLAB_DARK_GREEN 165
 #define MECHLAB_BRIGHT_GREEN 167
@@ -39,7 +39,7 @@ bool mechlab_get_selling(scene *scene);
 
 void mechlab_set_hint(scene *scene, const char *hint);
 #if ARCHIPELAGO_ENABLED
-chr_score *mechlab_get_ap_score(scene *scene);
+ap_alert *mechlab_get_ap_alert(scene *scene);
 #endif
 void mechlab_spin_har(scene *scene, bool to_spin_or_not_to_spin);
 
