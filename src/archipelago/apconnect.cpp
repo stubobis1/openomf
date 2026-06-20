@@ -18,6 +18,7 @@ extern "C" {
 #include "apconnect.h"
 #include "apitems.h"
 #include "apstate.h"
+#include "ap_sgmanager.h"
 #include "resources/resource_files.h"
 #include "utils/log.h"
 }
@@ -42,8 +43,10 @@ bool                  ap_mode        = false;
 static std::unique_ptr<APClient> ap;
 static ap_connection_status_t    g_status = APCONN_NOT_CONNECTED;
 static void (*g_item_cb)(const char *item_name, const char *player_name) = nullptr;
+static void (*g_foreign_item_cb)(const char *item_name, const char *player_name) = nullptr;
 static void (*g_buy_hint_cb)(int64_t location_id, const char *item_name, const char *player_name) = nullptr;
 static void (*g_items_done_cb)(void) = nullptr;
+static void (*g_replay_start_cb)(void) = nullptr;
 
 // ----- Item helpers -----
 
@@ -88,8 +91,12 @@ static void apply_item_idempotent(int64_t id) {
     } else if (id == AP_ITEM_TOURNAMENT_ACCESS) {
         if (APItems.tournament_access_count < 3)
             APItems.tournament_access_count++;
-    } else if (id == AP_ITEM_HAR_COLOR) {
-        APItems.extra_har_colors++;
+    } else if (id == AP_ITEM_HAR_COLOR_PRIMARY) {
+        APItems.har_color_unlocked |= 0x01;
+    } else if (id == AP_ITEM_HAR_COLOR_SECONDARY) {
+        APItems.har_color_unlocked |= 0x02;
+    } else if (id == AP_ITEM_HAR_COLOR_TERTIARY) {
+        APItems.har_color_unlocked |= 0x04;
     }
 }
 
@@ -111,7 +118,7 @@ static void apply_item_consumable(int64_t id) {
                   (id == AP_ITEM_MONEY_SMALL) ? "small" : "large",
                   base, t_mult, award, APStats.pending_money);
     }
-    // AP_ITEM_HAR_COLOR and AP_ITEM_TOURNAMENT_ACCESS are idempotent progressives, not consumables
+    // HAR color and tournament access items are idempotent progressives, not consumables
 }
 
 // ----- Handlers -----
@@ -122,8 +129,10 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
     // The server sends either a full replay (index starts at 0) or an incremental
     // batch (index > 0). Only wipe and rebuild on a full replay; for incremental
     // batches, accumulate on top of the existing state.
-    if (items.front().index == 0) {
+    bool full_replay = (items.front().index == 0);
+    if (full_replay) {
         log_debug("AP - items_received: full replay (%zu items)", items.size());
+        if (g_replay_start_cb) g_replay_start_cb();
         memset(&APItems,  0, sizeof(APItems));
         memset(&APChecks, 0, sizeof(APChecks));
         // Re-apply starting HAR in case it is precollected and absent from the replay.
@@ -162,13 +171,16 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
             APSave.last_applied_item_index = (uint32_t)net_item.index;
         }
 
-        if (g_item_cb) {
+        if (g_item_cb || (!full_replay && g_foreign_item_cb)) {
             std::string item_name   = ap->get_item_name(net_item.item, ap->get_player_game(net_item.player));
             std::string player_name = ap->get_player_alias(net_item.player);
             log_debug("AP - item: %s from %s (index %u, loc %lld)",
                       item_name.c_str(), player_name.c_str(),
                       (unsigned)net_item.index, (long long)net_item.location);
-            g_item_cb(item_name.c_str(), player_name.c_str());
+            if (g_item_cb)
+                g_item_cb(item_name.c_str(), player_name.c_str());
+            if (!full_replay && g_foreign_item_cb)
+                g_foreign_item_cb(item_name.c_str(), player_name.c_str());
         }
     }
 
@@ -197,6 +209,12 @@ static void on_slot_connected(const json& slot_data) {
         APSeedSettings.money_small_value = slot_data["money_small_value"].get<int>();
     if (slot_data.contains("money_large_value"))
         APSeedSettings.money_large_value = slot_data["money_large_value"].get<int>();
+    APSeedSettings.shop_hints = true;
+    if (slot_data.contains("shop_hints"))
+        APSeedSettings.shop_hints = slot_data["shop_hints"].get<bool>();
+    APSeedSettings.difficulty = 1;
+    if (slot_data.contains("difficulty"))
+        APSeedSettings.difficulty = slot_data["difficulty"].get<int>();
 
     // Mark starting HAR as unlocked — it's precollected on server but we still need it locally.
     if (APSeedSettings.starting_har >= 0 && APSeedSettings.starting_har <= 10) {
@@ -212,6 +230,10 @@ static void on_slot_connected(const json& slot_data) {
 }
 
 // ----- Public API -----
+
+extern "C" void Archipelago_SetForeignItemCallback(void (*cb)(const char *item_name, const char *player_name)) {
+    g_foreign_item_cb = cb;
+}
 
 extern "C" void Archipelago_Connect(const char *uri, const char *slot, const char *password) {
     log_info("AP - connecting: uri=%s slot=%s", uri, slot);
@@ -258,6 +280,7 @@ extern "C" void Archipelago_Disconnect(void) {
     ap.reset();
     g_status = APCONN_NOT_CONNECTED;
     ap_mode  = false;
+
 }
 
 extern "C" ap_connection_status_t Archipelago_ConnectionStatus(void) {
@@ -285,7 +308,8 @@ extern "C" void Archipelago_SetItemReceivedCallback(void (*cb)(const char *item_
 extern "C" void Archipelago_ScoutBuyLocation(int64_t location_id) {
     log_debug("AP - scout: loc %lld", (long long)location_id);
     if (ap && g_status == APCONN_READY) {
-        ap->LocationScouts({location_id}, 1 /* create_as_hint = broadcast */);
+        int as_hint = APSeedSettings.shop_hints ? 1 : 0;
+        ap->LocationScouts({location_id}, as_hint);
     }
 }
 
@@ -295,6 +319,10 @@ extern "C" void Archipelago_SetBuyHintCallback(void (*cb)(int64_t location_id, c
 
 extern "C" void Archipelago_SetItemsDoneCallback(void (*cb)(void)) {
     g_items_done_cb = cb;
+}
+
+extern "C" void Archipelago_SetReplayStartCallback(void (*cb)(void)) {
+    g_replay_start_cb = cb;
 }
 
 extern "C" void Archipelago_GetSaveIdent(char *out, size_t len) {
@@ -343,9 +371,12 @@ extern "C" bool Archipelago_APLoadState(const char *ident) {
         return false;
     }
     if (version >= 1) {
-        fread(APSave.har_money,                sizeof(int32_t),  11, f);
-        fread(&APSave.last_applied_item_index, sizeof(uint32_t), 1,  f);
-        fread(&APSave.tournaments_won_mask,    sizeof(uint8_t),  1,  f);
+        fread(APSave.har_money,             sizeof(int32_t),  11, f);
+        uint32_t disk_idx = 0;
+        fread(&disk_idx,                    sizeof(uint32_t), 1,  f);
+        if (disk_idx > APSave.last_applied_item_index)
+            APSave.last_applied_item_index = disk_idx;
+        fread(&APSave.tournaments_won_mask, sizeof(uint8_t),  1,  f);
     }
     fclose(f);
     log_debug("AP - state loaded: %s (last_idx=%u)", path_c(&save), APSave.last_applied_item_index);

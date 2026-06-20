@@ -128,11 +128,13 @@ typedef struct {
     int net_use_pmp;
 } settings_network;
 
+#if ARCHIPELAGO_ENABLED
 typedef struct {
-    char *ap_server;    // host:port, e.g. "localhost:38281"
+    char *ap_server;
     char *ap_slot;
     char *ap_password;
 } settings_archipelago;
+#endif
 
 typedef struct {
     settings_language language;
@@ -143,7 +145,9 @@ typedef struct {
     settings_tournament tournament;
     settings_keyboard keys;
     settings_network net;
+#if ARCHIPELAGO_ENABLED
     settings_archipelago archipelago;
+#endif
 } settings;
 
 int settings_write_defaults(const char *path);

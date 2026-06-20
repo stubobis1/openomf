@@ -58,15 +58,6 @@ path get_save_directory(void) {
     return name;
 }
 
-path get_ap_save_directory(void) {
-    path name = get_save_directory();
-    path_append(&name, "ap");
-    if(!path_exists(&name)) {
-        path_mkdir(&name);
-    }
-    return name;
-}
-
 bool scan_save_directory(list *results, const char *pattern) {
     const path scan = get_save_directory();
     return path_glob(&scan, results, pattern);

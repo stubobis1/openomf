@@ -20,7 +20,9 @@
 // Filler / miscellaneous items
 #define AP_ITEM_MONEY_SMALL         (AP_BASE_ID + 300)
 #define AP_ITEM_MONEY_LARGE         (AP_BASE_ID + 301)
-#define AP_ITEM_HAR_COLOR           (AP_BASE_ID + 302)
+#define AP_ITEM_HAR_COLOR_PRIMARY   (AP_BASE_ID + 302)
+#define AP_ITEM_HAR_COLOR_SECONDARY (AP_BASE_ID + 303)
+#define AP_ITEM_HAR_COLOR_TERTIARY  (AP_BASE_ID + 304)
 
 // Progressive tournament access (3 copies unlock Katushai=1, WAR=2, World=3)
 #define AP_ITEM_TOURNAMENT_ACCESS   (AP_BASE_ID + 500)

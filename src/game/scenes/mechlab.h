@@ -1,6 +1,7 @@
 #ifndef MECHLAB_H
 #define MECHLAB_H
 
+#include "archipelago/ap_alert.h"
 #include "formats/chr.h"
 #include "game/gui/component.h"
 #include "game/protos/scene.h"
@@ -37,7 +38,9 @@ void mechlab_set_selling(scene *scene, bool selling);
 bool mechlab_get_selling(scene *scene);
 
 void mechlab_set_hint(scene *scene, const char *hint);
-void mechlab_set_hint_wrapped(scene *scene, const char *hint);
+#if ARCHIPELAGO_ENABLED
+ap_alert *mechlab_get_ap_alert(scene *scene);
+#endif
 void mechlab_spin_har(scene *scene, bool to_spin_or_not_to_spin);
 
 sd_chr_enemy *mechlab_next_opponent(scene *scene);

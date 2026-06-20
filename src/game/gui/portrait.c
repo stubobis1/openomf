@@ -15,7 +15,6 @@ typedef struct portrait {
     sprite *img;
     int max;
     int selected;
-    sd_sprite *last_spr; // last sprite set via portrait_set_from_sprite; NULL if set via portrait_select
 } portrait;
 
 static void portrait_render(component *c) {
@@ -61,7 +60,6 @@ int portrait_load(sd_sprite *s, vga_palette *pal, int pilot_id) {
 
 void portrait_select(component *c, int pilot_id) {
     portrait *local = widget_get_obj(c);
-    local->last_spr = NULL; // portrait now comes from PIC file, not a pilot sprite
 
     // Free old image
     if(local->img != NULL) {
@@ -112,9 +110,6 @@ int portrait_selected(component *c) {
 
 void portrait_set_from_sprite(component *c, sd_sprite *spr) {
     portrait *local = widget_get_obj(c);
-    if(local->last_spr == spr) return; // same sprite, atlas entry already exists
-    local->last_spr = spr;
-
     // Free old image
     if(local->img != NULL) {
         sprite_free(local->img);

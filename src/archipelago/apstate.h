@@ -23,7 +23,7 @@ typedef struct {
     uint8_t  har_stats[11][AP_STAT_COUNT];     // [har_id][AP_STAT_*]
     uint8_t  pilot_stats[AP_PILOT_STAT_COUNT]; // [AP_PILOT_*]
     uint8_t  tournament_access_count;          // 0=NAO only; 1=+Katushai; 2=+WAR; 3=all
-    uint8_t  extra_har_colors;                 // additional HAR color slots received
+    uint8_t  har_color_unlocked;               // bitmask: bit0=primary, bit1=secondary, bit2=tertiary
 } ap_items_t;
 
 // AP money accumulates from item callbacks; drained into pilot->money at mechlab entry.
@@ -41,6 +41,8 @@ typedef struct {
     int  buy_cost_factor;  // 10-1000; divide by 100 for float multiplier
     int  money_small_value; // base credits for Money - Small (after factor; default AP_MONEY_SMALL_VALUE)
     int  money_large_value; // base credits for Money - Large (after factor; default AP_MONEY_LARGE_VALUE)
+    bool shop_hints;        // true = broadcast hint to AP server on shop focus; false = show in-game only
+    int  difficulty;        // 0=aluminium 1=iron 2=steel 3=heavy; applied to pilot->difficulty on load
 } ap_seed_settings_t;
 
 // Save-persistent AP state (written to .APS sidecar file alongside the .CHR save).

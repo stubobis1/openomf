@@ -194,8 +194,13 @@ set_source_files_properties("src/game/audio/audio_sources.c"
 
 # Remove all render plugin source code from OPENOMF_SRC
 list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/video/renderers/.*/")
-# Exclude AP submodule sources — built separately as omf_apclient.
-list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/submodule/")
+# Exclude AP sources when Archipelago is disabled; exclude submodule always (built separately).
+if(USE_ARCHIPELAGO)
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/submodule/")
+else()
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "^src/archipelago/")
+    list(FILTER OPENOMF_SRC EXCLUDE REGEX "menu_ap\.")
+endif()
 # Enable "NULL" renderer in debug builds, for automated testing
 list(APPEND OPENOMF_SRC
   "$<$<CONFIG:Debug>:src/video/renderers/null/null_renderer.c>"
@@ -271,6 +276,7 @@ if(USE_ARCHIPELAGO)
         AP_NO_SCHEMA
         ASIO_STANDALONE
         _WEBSOCKETPP_CPP11_STRICT_
+        _WEBSOCKETPP_CPP11_THREAD_
     )
     # Use system asio (libasio-dev) — the submodule asio 1.38 removed io_service
     # which websocketpp still requires.
@@ -283,9 +289,12 @@ if(USE_ARCHIPELAGO)
         ${AP_SUB}/websocketpp
         ${ASIO_INCLUDE_DIR}
     )
-    target_compile_definitions(openomf_core PUBLIC USE_ARCHIPELAGO)
-    # ap_mechlab.c is pure C — compiled into openomf_core (not omf_apclient).
+    target_compile_definitions(openomf_core PUBLIC ARCHIPELAGO_ENABLED)
+    # AP C files compiled into openomf_core (not omf_apclient).
+    target_sources(openomf_core PRIVATE src/archipelago/ap_alert.c)
     target_sources(openomf_core PRIVATE src/archipelago/ap_mechlab.c)
+    target_sources(openomf_core PRIVATE src/archipelago/ap_arena.c)
+    target_sources(openomf_core PRIVATE src/archipelago/ap_sgmanager.c)
     # Suppress warnings from heavy AP headers when compiling apconnect.cpp
     if(NOT MSVC)
         target_compile_options(omf_apclient PRIVATE -w)
@@ -293,6 +302,9 @@ if(USE_ARCHIPELAGO)
     # OpenSSL: needed by asio/ssl for wss:// support; PUBLIC so it propagates.
     find_package(OpenSSL REQUIRED)
     target_link_libraries(omf_apclient PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+    if(WIN32)
+        target_link_libraries(omf_apclient PUBLIC crypt32)
+    endif()
 endif()
 
 list(APPEND CORELIBS openomf_core)
