@@ -18,6 +18,7 @@ extern "C" {
 #include "apconnect.h"
 #include "apitems.h"
 #include "apstate.h"
+#include "ap_sgmanager.h"
 #include "resources/resource_files.h"
 #include "utils/log.h"
 }
