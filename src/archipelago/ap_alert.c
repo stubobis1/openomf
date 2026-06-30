@@ -21,11 +21,11 @@ typedef struct {
 } alert_text;
 
 static text *make_text(const char *str) {
-    text *t = text_create_with_font_and_size(FONT_SMALL, 155, 6);
+    text *t = text_create_with_font_and_size(FONT_SMALL, 155, 18);
     text_set_color(t, AP_ALERT_COLOR);
     text_set_shadow_color(t, AP_ALERT_SHADOW);
     text_set_shadow_style(t, GLYPH_SHADOW_RIGHT | GLYPH_SHADOW_BOTTOM);
-    text_set_word_wrap(t, false);
+    text_set_word_wrap(t, true);
     text_set_from_c(t, str);
     text_generate_layout(t);
     return t;
