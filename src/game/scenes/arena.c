@@ -369,7 +369,7 @@ static void arena_end(scene *sc) {
         }
         if(fight_stats->winner == 0) {
 #if ARCHIPELAGO_ENABLED
-            if(ap_mode && is_tournament(gs) && p1->chr) ap_arena_match_win(gs, p1, p2);
+            if(ap_mode && is_tournament(gs) && p1->chr && !gs->match_settings.sim) ap_arena_match_win(gs, p1, p2);
 #endif
             int16_t hp_left_percent = har_health_percent(p1_har);
             // check if this is an unranked challenger with an enhancement we don't have
