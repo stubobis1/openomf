@@ -7,7 +7,6 @@
 #include "archipelago/apconnect.h"
 #include "archipelago/apitems.h"
 #include "archipelago/apstate.h"
-#include "archipelago/ap_alert.h"
 #include "archipelago/ap_arena.h"
 #include "formats/chr.h"
 #include "formats/pilot.h"
@@ -32,7 +31,6 @@
 
 static scene   *g_scene       = NULL;
 static int64_t  g_scout_loc   = 0;
-static bool     g_past_replay = false;
 
 static component *g_train_stat_label  = NULL;
 static component *g_train_price_label = NULL;
@@ -190,23 +188,15 @@ static void restore_tournament(const char *trn_name) {
 
 // --- AP Callbacks ---
 
-static void on_replay_start(void) {
-    g_past_replay = false;
-}
-
 static void on_item_received(const char *item_name, const char *player_name) {
+    (void)item_name; (void)player_name;
     if(!g_scene) return;
-    log_debug("AP - item received: %s (from %s)", item_name, player_name);
-    if(g_past_replay)
-        ap_alert_show_item(mechlab_get_ap_alert(g_scene), item_name, player_name);
-    // Sync stats immediately so progressives take effect before on_items_done fires.
     game_player *p1 = game_state_get_player(g_scene->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
     if(pilot) ap_sync_pilot(pilot);
 }
 
 static void on_items_done(void) {
-    g_past_replay = true;
     if(!g_scene) return;
     game_player *p1 = game_state_get_player(g_scene->gs, 0);
     sd_pilot *pilot = game_player_get_pilot(p1);
@@ -295,14 +285,12 @@ void ap_mechlab_attach(scene *s) {
         ap_sync_pilot(pilot);
     }
 
-    Archipelago_SetReplayStartCallback(on_replay_start);
     Archipelago_SetItemReceivedCallback(on_item_received);
     Archipelago_SetBuyHintCallback(on_buy_hint);
     Archipelago_SetItemsDoneCallback(on_items_done);
 }
 
 void ap_mechlab_detach(void) {
-    Archipelago_SetReplayStartCallback(NULL);
     Archipelago_SetItemReceivedCallback(NULL);
     Archipelago_SetBuyHintCallback(NULL);
     Archipelago_SetItemsDoneCallback(NULL);

@@ -19,6 +19,7 @@ extern "C" {
 #include "apitems.h"
 #include "apstate.h"
 #include "ap_sgmanager.h"
+#include "game/gui/osd/osd.h"
 #include "resources/resource_files.h"
 #include "utils/log.h"
 }
@@ -39,14 +40,36 @@ ap_checks_t           APChecks       = {};
 ap_tournament_state_t APTournament   = {};
 bool                  ap_mode        = false;
 
+// OSD color palette indices for AP notifications
+#define AP_OSD_ITEM_COLOR   ((vga_index)0xE7)
+#define AP_OSD_ITEM_SHADOW  ((vga_index)0xF8)
+#define AP_OSD_CONN_COLOR   ((vga_index)0xFD)
+#define AP_OSD_CONN_SHADOW  ((vga_index)0xC0)
+
 // ----- Internal state -----
 static std::unique_ptr<APClient> ap;
 static ap_connection_status_t    g_status = APCONN_NOT_CONNECTED;
 static void (*g_item_cb)(const char *item_name, const char *player_name) = nullptr;
-static void (*g_foreign_item_cb)(const char *item_name, const char *player_name) = nullptr;
 static void (*g_buy_hint_cb)(int64_t location_id, const char *item_name, const char *player_name) = nullptr;
 static void (*g_items_done_cb)(void) = nullptr;
-static void (*g_replay_start_cb)(void) = nullptr;
+
+// ----- OSD helpers -----
+
+static std::string format_item_osd(const std::string& item, const std::string& player) {
+    std::string s = item + " from " + player;
+    for (char& c : s) c = (char)tolower((unsigned char)c);
+    auto repl = [](std::string& str, const char* from, const char* to) {
+        size_t p = 0, flen = strlen(from), tlen = strlen(to);
+        while ((p = str.find(from, p)) != std::string::npos) {
+            str.replace(p, flen, to);
+            p += tlen;
+        }
+    };
+    repl(s, "progressive ", "prog. ");
+    repl(s, "stun resist", "stun res");
+    repl(s, "endurance", "endur.");
+    return s;
+}
 
 // ----- Item helpers -----
 
@@ -132,7 +155,6 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
     bool full_replay = (items.front().index == 0);
     if (full_replay) {
         log_debug("AP - items_received: full replay (%zu items)", items.size());
-        if (g_replay_start_cb) g_replay_start_cb();
         memset(&APItems,  0, sizeof(APItems));
         memset(&APChecks, 0, sizeof(APChecks));
         // Re-apply starting HAR in case it is precollected and absent from the replay.
@@ -171,16 +193,18 @@ static void on_items_received(const std::list<APClient::NetworkItem>& items) {
             APSave.last_applied_item_index = (uint32_t)net_item.index;
         }
 
-        if (g_item_cb || (!full_replay && g_foreign_item_cb)) {
-            std::string item_name   = ap->get_item_name(net_item.item, ap->get_player_game(net_item.player));
-            std::string player_name = ap->get_player_alias(net_item.player);
+        if (g_item_cb || !full_replay) {
+            std::string iname = ap->get_item_name(net_item.item, ap->get_player_game(net_item.player));
+            std::string pname = ap->get_player_alias(net_item.player);
             log_debug("AP - item: %s from %s (index %u, loc %lld)",
-                      item_name.c_str(), player_name.c_str(),
+                      iname.c_str(), pname.c_str(),
                       (unsigned)net_item.index, (long long)net_item.location);
             if (g_item_cb)
-                g_item_cb(item_name.c_str(), player_name.c_str());
-            if (!full_replay && g_foreign_item_cb)
-                g_foreign_item_cb(item_name.c_str(), player_name.c_str());
+                g_item_cb(iname.c_str(), pname.c_str());
+            if (!full_replay) {
+                std::string osd_text = format_item_osd(iname, pname);
+                osd_print_color(AP_OSD_ITEM_COLOR, AP_OSD_ITEM_SHADOW, "%s", osd_text.c_str());
+            }
         }
     }
 
@@ -227,13 +251,10 @@ static void on_slot_connected(const json& slot_data) {
              APSeedSettings.goal_tournament, APSeedSettings.starting_har,
              APSeedSettings.har_stat_max, APSeedSettings.pilot_stat_max,
              (int)APSeedSettings.include_buy);
+    osd_print_color(AP_OSD_CONN_COLOR, AP_OSD_CONN_SHADOW, "Connected to Archipelago");
 }
 
 // ----- Public API -----
-
-extern "C" void Archipelago_SetForeignItemCallback(void (*cb)(const char *item_name, const char *player_name)) {
-    g_foreign_item_cb = cb;
-}
 
 extern "C" void Archipelago_Connect(const char *uri, const char *slot, const char *password) {
     log_info("AP - connecting: uri=%s slot=%s", uri, slot);
@@ -254,6 +275,7 @@ extern "C" void Archipelago_Connect(const char *uri, const char *slot, const cha
         (void)errors;
         log_error("AP - slot refused");
         g_status = APCONN_FATAL_ERROR;
+        osd_print_color(AP_OSD_CONN_COLOR, AP_OSD_CONN_SHADOW, "AP: connection refused");
     });
     ap->set_items_received_handler(on_items_received);
     ap->set_location_info_handler([=](const std::list<APClient::NetworkItem>& items) {
@@ -267,7 +289,21 @@ extern "C" void Archipelago_Connect(const char *uri, const char *slot, const cha
     ap->set_socket_disconnected_handler([]() {
         log_info("AP - socket disconnected");
         if (g_status == APCONN_READY) {
-            g_status = APCONN_CONNECTING; // reconnecting
+            g_status = APCONN_CONNECTING;
+            osd_print_color(AP_OSD_CONN_COLOR, AP_OSD_CONN_SHADOW, "AP: disconnected, reconnecting...");
+        }
+    });
+    ap->set_print_json_handler([](const APClient::PrintJSONArgs& args) {
+        if (args.type == "Chat") {
+            std::string text = ap->render_json(args.data);
+            if (text.size() >= 255) text.resize(255);
+            osd_print_color(AP_OSD_CONN_COLOR, AP_OSD_CONN_SHADOW, "%s", text.c_str());
+        } else if (args.type == "ItemSend" && args.receiving != nullptr) {
+            if (!ap->slot_concerns_self(*args.receiving)) {
+                std::string text = ap->render_json(args.data);
+                if (text.size() >= 255) text.resize(255);
+                osd_print_color(AP_OSD_ITEM_COLOR, AP_OSD_ITEM_SHADOW, "%s", text.c_str());
+            }
         }
     });
 }
@@ -321,9 +357,6 @@ extern "C" void Archipelago_SetItemsDoneCallback(void (*cb)(void)) {
     g_items_done_cb = cb;
 }
 
-extern "C" void Archipelago_SetReplayStartCallback(void (*cb)(void)) {
-    g_replay_start_cb = cb;
-}
 
 extern "C" void Archipelago_GetSaveIdent(char *out, size_t len) {
     if (!ap || !len) return;

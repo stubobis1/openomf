@@ -291,7 +291,6 @@ if(USE_ARCHIPELAGO)
     )
     target_compile_definitions(openomf_core PUBLIC ARCHIPELAGO_ENABLED)
     # AP C files compiled into openomf_core (not omf_apclient).
-    target_sources(openomf_core PRIVATE src/archipelago/ap_alert.c)
     target_sources(openomf_core PRIVATE src/archipelago/ap_mechlab.c)
     target_sources(openomf_core PRIVATE src/archipelago/ap_arena.c)
     target_sources(openomf_core PRIVATE src/archipelago/ap_sgmanager.c)

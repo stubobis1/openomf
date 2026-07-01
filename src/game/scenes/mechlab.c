@@ -5,7 +5,6 @@
 #include <string.h>
 
 #if ARCHIPELAGO_ENABLED
-#include "archipelago/ap_alert.h"
 #include "archipelago/ap_mechlab.h"
 #include "archipelago/apstate.h"
 #endif
@@ -64,9 +63,6 @@ typedef struct {
     text *popup;
     surface popup_bg1;
     surface popup_bg2;
-#if ARCHIPELAGO_ENABLED
-    ap_alert ap_alert;
-#endif
 } mechlab_local;
 
 bool mechlab_find_last_player(scene *scene) {
@@ -202,9 +198,6 @@ void mechlab_free(scene *scene) {
         object_free(&local->bg_obj[i]);
     }
 
-#if ARCHIPELAGO_ENABLED
-    ap_alert_free(&local->ap_alert);
-#endif
     text_free(&local->popup);
     surface_free(&local->popup_bg1);
     surface_free(&local->popup_bg2);
@@ -310,10 +303,6 @@ static void mechlab_theme(gui_theme *theme) {
 
 void mechlab_tick(scene *scene, int paused) {
     mechlab_local *local = scene_get_userdata(scene);
-
-#if ARCHIPELAGO_ENABLED
-    if(ap_mode) ap_alert_tick(&local->ap_alert);
-#endif
 
     if(local->popup) {
         return;
@@ -555,9 +544,6 @@ void mechlab_render(scene *scene) {
         text_draw(local->popup, (NATIVE_W - POPUP_TEXT_W) / 2, POPUP_CENTERY - POPUP_TEXT_H / 2);
     }
 
-#if ARCHIPELAGO_ENABLED
-    if(ap_mode) ap_alert_render(&local->ap_alert);
-#endif
 }
 
 void mechlab_input_tick(scene *scene) {
@@ -628,13 +614,6 @@ void mechlab_input_tick(scene *scene) {
     controller_free_chain(p1);
 }
 
-#if ARCHIPELAGO_ENABLED
-ap_alert *mechlab_get_ap_alert(scene *scene) {
-    mechlab_local *local = scene_get_userdata(scene);
-    return &local->ap_alert;
-}
-#endif
-
 // Init mechlab
 int mechlab_create(scene *scene) {
     // Alloc
@@ -676,11 +655,6 @@ int mechlab_create(scene *scene) {
     component_set_size_hints(local->hint, 248, 13);
     component_init(local->hint, &local->theme);
     component_layout(local->hint, 32, 131, 248, 13);
-
-#if ARCHIPELAGO_ENABLED
-    ap_alert_create(&local->ap_alert);
-    ap_alert_set_pos(&local->ap_alert, 160, 30);
-#endif
 
     scene_set_userdata(scene, local);
     bool found =
