@@ -1048,8 +1048,8 @@ void lobby_tick(scene *scene, int paused) {
 
                 /* Store any relevant client information here. */
                 event.peer->data = NULL;
-                log_debug("new peer was %d, server peer was %d, opponent peer was %d", event.peer, local->peer,
-                          local->opponent_peer);
+                log_debug("new peer was %p, server peer was %p, opponent peer was %p", (void *)event.peer,
+                          (void *)local->peer, (void *)local->opponent_peer);
 
                 if(local->opponent_peer && event.peer->address.host == local->opponent->address.host) {
                     log_debug("connected to peer outbound!");
@@ -1082,10 +1082,10 @@ void lobby_tick(scene *scene, int paused) {
 
                     p1->pilot->har_id = HAR_JAGUAR;
                     p1->pilot->pilot_id = 0;
-                    p1->pilot->name[0] = '\0';
+                    str_set_c(&p1->pilot->name, "");
                     p2->pilot->har_id = HAR_JAGUAR;
                     p2->pilot->pilot_id = 0;
-                    p2->pilot->name[0] = '\0';
+                    str_set_c(&p2->pilot->name, "");
 
                     net_ctrl = omf_calloc(1, sizeof(controller));
                     controller_init(net_ctrl, gs);
@@ -1262,10 +1262,10 @@ void lobby_tick(scene *scene, int paused) {
 
                             p1->pilot->har_id = HAR_JAGUAR;
                             p1->pilot->pilot_id = 0;
-                            p1->pilot->name[0] = '\0';
+                            str_set_c(&p1->pilot->name, "");
                             p2->pilot->har_id = HAR_JAGUAR;
                             p2->pilot->pilot_id = 0;
-                            p2->pilot->name[0] = '\0';
+                            str_set_c(&p2->pilot->name, "");
 
                             net_ctrl = omf_calloc(1, sizeof(controller));
                             controller_init(net_ctrl, gs);
@@ -1315,8 +1315,8 @@ void lobby_tick(scene *scene, int paused) {
                             local->controllers_created = true;
 
                         } else {
-                            log_debug("opponent peer %d, host %d %d", local->opponent_peer, event.peer->address.host,
-                                      local->opponent->address.host);
+                            log_debug("opponent peer %p, host %d %d", (void *)local->opponent_peer,
+                                      event.peer->address.host, local->opponent->address.host);
                         }
                         break;
                     case PACKET_YELL: {
@@ -1367,10 +1367,10 @@ void lobby_tick(scene *scene, int paused) {
 
                         p1->pilot->har_id = HAR_JAGUAR;
                         p1->pilot->pilot_id = 0;
-                        p1->pilot->name[0] = '\0';
+                        str_set_c(&p1->pilot->name, "");
                         p2->pilot->har_id = HAR_JAGUAR;
                         p2->pilot->pilot_id = 0;
-                        p2->pilot->name[0] = '\0';
+                        str_set_c(&p2->pilot->name, "");
 
                         net_ctrl = omf_calloc(1, sizeof(controller));
                         controller_init(net_ctrl, gs);

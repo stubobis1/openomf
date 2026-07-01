@@ -38,6 +38,7 @@
 #include "archipelago/apstate.h"
 #endif
 #include "resources/languages.h"
+#include "resources/script_cache.h"
 #include "resources/sgmanager.h"
 #include "utils/allocator.h"
 #include "utils/log.h"
@@ -198,13 +199,13 @@ void scene_ready_anim_done(object *parent) {
 
     // Custom object finisher callback requires that we
     // mark object as finished manually, if necessary.
-    object_set_finished(parent);
+    object_set_finished(parent, true);
 }
 
 void scene_youwin_anim_done(object *parent) {
     // Custom object finisher callback requires that we
     // mark object as finished manually, if necessary.
-    object_set_finished(parent);
+    object_set_finished(parent, true);
     arena_local *local = scene_get_userdata(parent->gs->sc);
     local->win_state = DONE;
 }
@@ -225,7 +226,7 @@ void scene_youwin_anim_start(void *userdata) {
 void scene_youlose_anim_done(object *parent) {
     // Custom object finisher callback requires that we
     // mark object as finished manually, if necessary.
-    object_set_finished(parent);
+    object_set_finished(parent, true);
     arena_local *local = scene_get_userdata(parent->gs->sc);
     local->win_state = DONE;
 }
@@ -402,7 +403,7 @@ static void arena_end(scene *sc) {
             } else
 #endif
             if(sg_save(p1->chr) != SD_SUCCESS) {
-                log_error("Failed to save pilot %s", p1->chr->pilot.name);
+                log_error("Failed to save pilot %s", str_c(&p1->chr->pilot.name));
             }
         }
         if(is_demoplay(gs)) {
@@ -422,8 +423,8 @@ static void arena_end(scene *sc) {
         }
         game_state_set_next(gs, SCENE_LOBBY);
     } else {
-        player_winner->pilot->name[0] = '\0';
-        player_loser->pilot->name[0] = '\0';
+        str_set_c(&player_winner->pilot->name, "");
+        str_set_c(&player_loser->pilot->name, "");
         game_state_set_next(gs, SCENE_MELEE);
     }
 
@@ -583,7 +584,7 @@ bool can_wallslam(int player_id, scene *scene) {
     object *o_har2 =
         game_state_find_object(scene->gs, game_player_get_har_obj_id(game_state_get_player(scene->gs, !player_id)));
 
-    if(player_frame_isset(o_har2, "cw")) {
+    if(player_frame_isset(o_har2, TAG_CW)) {
         return true;
     }
 
@@ -614,7 +615,7 @@ void arena_har_hit_wall_hook(int player_id, int wall, scene *scene) {
     }
 
     float abs_velocity_h = fabsf(o_har->vel.x) / o_har->horizontal_velocity_modifier;
-    if(player_frame_isset(o_har2, "cw")) {
+    if(player_frame_isset(o_har2, TAG_CW)) {
         abs_velocity_h = 7;
     }
 
@@ -1008,7 +1009,7 @@ void write_rec_move(scene *scene, game_player *player, int action) {
 
     int ret;
 
-    if((ret = sd_rec_insert_action(scene->gs->rec, scene->gs->rec->move_count, &move)) != SD_SUCCESS) {
+    if((ret = sd_rec_insert_action(scene->gs->rec, vector_size(&scene->gs->rec->moves), &move)) != SD_SUCCESS) {
         log_debug("recoding move failed %d", ret);
     }
 }
@@ -1088,7 +1089,8 @@ void arena_spawn_hazard(scene *scene) {
                         }
                     }
 
-                    log_debug("Arena tick: Hazard with probability %d started.", info->probability, info->ani.id);
+                    log_debug("Arena tick: Hazard with probability %d started (anim id %d).", info->probability,
+                              info->ani.id);
                 } else {
                     object_free(obj);
                     omf_free(obj);
@@ -1347,7 +1349,7 @@ void arena_dynamic_tick(scene *scene, int paused) {
                 local->win_state = NONE;
             } else if(local->win_state == DONE) {
                 // you win/lose animation is done
-                if(player_frame_isset(obj_har[0], "be") || player_frame_isset(obj_har[1], "be") ||
+                if(player_frame_isset(obj_har[0], TAG_BE) || player_frame_isset(obj_har[1], TAG_BE) ||
                    chr_score_onscreen(s1) || chr_score_onscreen(s2) || har_is_scrap_walking(obj_har[0]) ||
                    har_is_scrap_walking(obj_har[1])) {
                     local->state_ticks = 50;
@@ -1411,9 +1413,9 @@ void arena_dynamic_tick(scene *scene, int paused) {
         }
 
         // check some invariants
-        assert(player_frame_isset(obj_har[0], "ab") ||
+        assert(player_frame_isset(obj_har[0], TAG_AB) ||
                (obj_har[0]->pos.x >= ARENA_LEFT_WALL && obj_har[0]->pos.x <= ARENA_RIGHT_WALL));
-        assert(player_frame_isset(obj_har[1], "ab") ||
+        assert(player_frame_isset(obj_har[1], TAG_AB) ||
                (obj_har[1]->pos.x >= ARENA_LEFT_WALL && obj_har[1]->pos.x <= ARENA_RIGHT_WALL));
         if(hars[0]->health == 0) {
             assert(hars[0]->state == STATE_DEFEAT || hars[0]->state == STATE_RECOIL || hars[0]->state == STATE_NONE ||
@@ -1732,11 +1734,11 @@ void arena_clone_free(scene *scene) {
 }
 
 int arena_create(scene *scene) {
-    settings *setting;
-    arena_local *local;
+    // Free up the script cache here, since we know that we don't share animations over the arena start.
+    script_cache_clear();
 
     // Load up settings
-    setting = settings_get();
+    settings *setting = settings_get();
 
     fight_stats *fight_stats = &scene->gs->fight_stats;
     memset(fight_stats, 0, sizeof(*fight_stats));
@@ -1761,7 +1763,7 @@ int arena_create(scene *scene) {
     }
 
     // Initialize local struct
-    local = omf_calloc(1, sizeof(arena_local));
+    arena_local *local = omf_calloc(1, sizeof(arena_local));
     scene_set_userdata(scene, local);
 
     // Set correct state
@@ -1924,7 +1926,7 @@ int arena_create(scene *scene) {
 
     // Set the name and HAR here, as they will remain static during the match. Ping will be dynamically set.
     for(int i = 0; i < 2; i++) {
-        local->player_name[i] = create_text_object(_player[i]->pilot->name);
+        local->player_name[i] = create_text_object(str_c(&_player[i]->pilot->name));
         local->player_har[i] = create_text_object(lang_get(_player[i]->pilot->har_id + 31));
         local->player_ping[i] = create_text_object("0");
     }

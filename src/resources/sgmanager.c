@@ -30,7 +30,7 @@ list *sg_load_all(void) {
     list dir_list;
     list_create(&dir_list);
     if(!scan_save_directory(&dir_list, "*.CHR")) {
-        log_error("Failed to scan savegame directory!", dirname);
+        log_error("Failed to scan savegame directory %s!", dirname);
         return NULL;
     }
     log_debug("Found %d saved games", list_size(&dir_list));
@@ -76,15 +76,15 @@ int sg_load_pilot(sd_chr_file *chr, const char *pilot_name) {
 
 int sg_save(sd_chr_file *chr) {
     path save = get_save_directory();
-    path_append(&save, chr->pilot.name);
+    path_append(&save, str_c(&chr->pilot.name));
     path_set_ext(&save, ".CHR");
     path_dossify_filename(&save);
 
     const int ret = sd_chr_save(chr, &save);
     if(ret != SD_SUCCESS) {
-        log_error("Saving pilot %s to %s failed: %s", chr->pilot.name, path_c(&save), strerror(errno));
+        log_error("Saving pilot %s to %s failed: %s", str_c(&chr->pilot.name), path_c(&save), strerror(errno));
     } else {
-        log_info("Saved pilot %s to %s", chr->pilot.name, path_c(&save));
+        log_info("Saved pilot %s to %s", str_c(&chr->pilot.name), path_c(&save));
         str stem;
         path_stem(&save, &stem);
         omf_free(settings_get()->tournament.last_name);
